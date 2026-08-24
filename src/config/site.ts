@@ -25,7 +25,7 @@ export const siteConfig = {
 
   /** Ghost buttons on the right of the dashboard header. */
   headerLinks: [
-    { label: "Landing Page", href: "/landing", external: false },
+    { label: "Home", href: "/landing", external: false },
     { label: "Pricing", href: "/pricing", external: false },
     { label: "Contact", href: "mailto:Zaxellimited360@gmail.com", external: true },
   ],
