@@ -61,22 +61,68 @@ function env(key: string, fallback = ""): string {
   return process.env[key]?.trim() || fallback
 }
 
-export function activeProvider(): ProviderName {
-  const raw = env("AI_PROVIDER", "stub").toLowerCase()
-  const known: ProviderName[] = [
-    "stub",
-    "gemini",
-    "groq",
-    "openrouter",
-    "anthropic",
-  ]
-  return (known as string[]).includes(raw) ? (raw as ProviderName) : "stub"
+const KNOWN_PROVIDERS: ProviderName[] = [
+  "stub",
+  "gemini",
+  "groq",
+  "openrouter",
+  "anthropic",
+]
+
+function parseProvider(raw: string): ProviderName | null {
+  const value = raw.trim().toLowerCase()
+  if (!value) return null
+  return (KNOWN_PROVIDERS as string[]).includes(value)
+    ? (value as ProviderName)
+    : null
 }
 
+export function activeProvider(): ProviderName {
+  const raw = env("AI_PROVIDER", "stub")
+  const parsed = parseProvider(raw)
+  if (!parsed) {
+    console.warn(
+      `[ai] AI_PROVIDER="${raw}" is not a known provider; using stub. ` +
+        `Known: ${KNOWN_PROVIDERS.join(", ")}.`,
+    )
+    return "stub"
+  }
+  return parsed
+}
+
+/**
+ * The provider to try when the primary fails a retryable way.
+ *
+ * Validated rather than cast. The old version trusted the string, so
+ * AI_FALLBACK_PROVIDER="grok" — one letter out — fell through `dispatch` to
+ * the stub branch and looked exactly like having no failover at all. A typo in
+ * a disaster-recovery setting should be loud, because the day it matters is
+ * the day nobody is reading logs.
+ *
+ * "stub" is rejected as a fallback: it is already the floor, and naming it
+ * here would imply a level of protection that is not there.
+ */
 function fallbackProvider(): ProviderName | null {
-  const raw = env("AI_FALLBACK_PROVIDER").toLowerCase()
+  const raw = env("AI_FALLBACK_PROVIDER")
   if (!raw) return null
-  return raw === activeProvider() ? null : (raw as ProviderName)
+
+  const parsed = parseProvider(raw)
+  if (!parsed) {
+    console.warn(
+      `[ai] AI_FALLBACK_PROVIDER="${raw}" is not a known provider; ` +
+        `no failover is configured. Known: ${KNOWN_PROVIDERS.join(", ")}.`,
+    )
+    return null
+  }
+  if (parsed === "stub") return null
+  if (parsed === activeProvider()) {
+    console.warn(
+      `[ai] AI_FALLBACK_PROVIDER matches AI_PROVIDER ("${parsed}"); ` +
+        `a second key on the same provider shares the same quota.`,
+    )
+    return null
+  }
+  return parsed
 }
 
 /**
@@ -522,6 +568,26 @@ async function dispatch(
  * limit should degrade the lead to "needs review", not take down lead capture.
  * Losing a lead is the failure this whole system exists to prevent.
  */
+/** The configured failover target, or null. Exposed so tooling can report it. */
+export function configuredFallback(): ProviderName | null {
+  return fallbackProvider()
+}
+
+/**
+ * Call one named provider directly, with no failover and no stub safety net.
+ *
+ * For verification tooling only. `generateStructured` deliberately swallows a
+ * provider failure and degrades, which is right in production and useless when
+ * the question is "does this specific key work" — the answer comes back as
+ * usable stub output either way. This is the seam that lets a check fail.
+ */
+export async function probeProvider(
+  name: ProviderName,
+  req: GenerateRequest,
+): Promise<GenerateResult> {
+  return dispatch(name, req)
+}
+
 export async function generateStructured(
   req: GenerateRequest,
 ): Promise<GenerateResult> {
@@ -546,17 +612,34 @@ export async function generateStructured(
       error instanceof Error ? error.message : String(error),
     )
 
+    const describe = (who: string, err: unknown) =>
+      `${who}: ${err instanceof Error ? err.message : String(err)}`
+
+    /** Every link that failed, in order, so the whole chain is reportable. */
+    const failures = [describe(primary, error)]
+
     if (fallback && retryable) {
+      console.warn(`[ai] rolling over from ${primary} to ${fallback}`)
       try {
-        return await dispatch(fallback, req)
+        const result = await dispatch(fallback, req)
+        console.warn(`[ai] ${fallback} answered; ${primary} was skipped`)
+        return result
       } catch (fallbackError) {
-        console.error(
-          `[ai] fallback ${fallback} also failed:`,
-          fallbackError instanceof Error
-            ? fallbackError.message
-            : String(fallbackError),
-        )
+        console.error(`[ai] fallback ${fallback} also failed:`, fallbackError)
+        failures.push(describe(fallback, fallbackError))
       }
+    } else if (!fallback && retryable) {
+      /**
+       * Worth saying out loud. This failure was the kind a second provider
+       * would have absorbed — a rate limit, a quota, an outage — and the only
+       * reason the lead is about to read NEEDS_REVIEW is that no failover is
+       * configured. That is a settings problem, not a model problem, and it
+       * should not have to be inferred.
+       */
+      console.warn(
+        `[ai] ${primary} failed retryably and no AI_FALLBACK_PROVIDER is set — ` +
+          `a second provider would have absorbed this`,
+      )
     }
 
     if (primary !== "stub") {
@@ -564,13 +647,12 @@ export async function generateStructured(
         `[ai] degrading to stub output — this lead will read as NEEDS_REVIEW`,
       )
       const stubbed = await callStub(req)
+      const unprotected =
+        retryable && !fallback ? " (no AI_FALLBACK_PROVIDER configured)" : ""
       return {
         ...stubbed,
-        model: `stub (after ${primary} failed)`,
-        degradedReason:
-          error instanceof Error
-            ? `${primary}: ${error.message}`
-            : `${primary}: ${String(error)}`,
+        model: `stub (after ${failures.length > 1 ? "all providers" : primary} failed)`,
+        degradedReason: failures.join(" | ") + unprotected,
       }
     }
 

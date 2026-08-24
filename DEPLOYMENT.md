@@ -1,19 +1,25 @@
 # Deploying BrightPath
 
-The intended flow is **local → GitHub → Vercel**: you push to `master`, Vercel
-builds from the repo, nothing is uploaded by hand. Setting that up takes two
-things Vercel will not let an API do on your behalf — connecting the GitHub
-account, and entering secrets — so those steps are yours. Everything after is
-automatic.
+The flow is **local → GitHub → Vercel**: you push to `master`, Vercel builds
+from the repo, nothing is uploaded by hand. This is set up and running —
+<https://brightpath-dashboard.vercel.app>.
+
+The two steps Vercel will not let an API do on your behalf are connecting the
+GitHub account and entering secrets, so those are recorded here for when they
+need doing again.
 
 ---
 
-## 1. Connect GitHub to Vercel
+## 1. Connect GitHub to Vercel — **done**
 
-This is the step that is currently missing, and it blocks everything else: the
-Vercel account has no Git integration, so it cannot see
-`Kikobazz123/brightpath-dashboard` at all. The repo is **private**, so a
-connection is required — there is no public-URL shortcut.
+Already set up, and live at <https://brightpath-dashboard.vercel.app>. Kept here
+because it is the step that blocks everything else if the link is ever lost, and
+because it is the one part of this that is not obvious.
+
+The confusion is that two different things are both called "connecting GitHub":
+linking a GitHub identity to your Vercel *login*, and installing the Vercel
+GitHub *App* so Vercel can read your repositories. You need the second. The repo
+is **private**, so there is no public-URL shortcut.
 
 1. Go to <https://vercel.com/new>.
 2. Under **Import Git Repository**, choose **Add GitHub Account** (or
@@ -50,7 +56,9 @@ real values have never been committed.
 | `DEMO_TENANT_ID` | `brightpath` | **Yes** |
 | `AI_PROVIDER` | `gemini` | Yes, to analyse leads |
 | `GEMINI_API_KEY` | From <https://aistudio.google.com/apikey> | Yes, with the above |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | No — this is the default |
+| `GEMINI_MODEL` | `gemini-3.6-flash` | No — this is the default |
+| `AI_FALLBACK_PROVIDER` | `groq` | Strongly recommended — see below |
+| `GROQ_API_KEY` | From <https://console.groq.com/keys> | With the above |
 | `SLA_FIRST_TOUCH_MINUTES` | `15` | No — this is the default |
 | `DEMO_ACTOR` | `rep` | No — this is the default |
 | `CAPTURE_RATE_LIMIT` | `20` | No — this is the default |
@@ -65,6 +73,23 @@ Two of these are load-bearing in ways worth knowing:
   back to stub, and every newly captured lead comes back `NEEDS_REVIEW` with no
   drafted message. The pre-seeded demo leads keep their scores. `/api/v1/health`
   reports this as `degraded` rather than pretending to be fine.
+
+### Why the fallback is worth five minutes
+
+`AI_PROVIDER` on its own is a single point of failure. Gemini's free tier has a
+daily cap, and when it is reached every lead captured until it resets comes back
+`NEEDS_REVIEW` with no drafted message. Nothing errors and nothing is lost — the
+system degrades honestly — but the assistant stops assisting, and it will happen
+at the busiest moment rather than a convenient one.
+
+Setting `AI_FALLBACK_PROVIDER="groq"` with a Groq key means a rate limit, a
+quota, or an outage on Gemini rolls over to Groq automatically, per request. Use
+a different provider rather than a second Gemini key: two keys on one account
+share the quota you are trying to survive.
+
+Then run `pnpm verify:provider`. It calls the fallback directly, with no safety
+net, so a bad key or a retired model name fails in that check rather than on the
+day the primary goes down.
 
 ## 4. Deploy
 

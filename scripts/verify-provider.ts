@@ -15,10 +15,14 @@
  * says why. This script makes the failure loud and names the cause.
  */
 
-import { analyzeLead } from "../src/lib/pipeline/analyst"
+import { ANALYST_SYSTEM_PROMPT, analyzeLead } from "../src/lib/pipeline/analyst"
 import { writeFollowUp } from "../src/lib/pipeline/writer"
 import { scoreLead } from "../src/lib/pipeline/scoring"
-import { activeProvider } from "../src/lib/ai/provider"
+import {
+  activeProvider,
+  configuredFallback,
+  probeProvider,
+} from "../src/lib/ai/provider"
 
 /** States company size, industry, need with a deadline, budget and intent. */
 const SAMPLE = `Hi — we are a 40-person accountancy practice in Leeds and our
@@ -113,7 +117,59 @@ async function main() {
   console.log("")
   console.log(indent(draft.draft.message))
 
+  await checkFallback()
+
   console.log("\nProvider is working end to end.\n")
+}
+
+/**
+ * Prove the failover target actually answers.
+ *
+ * An untested fallback is worse than none: it reads as protection right up
+ * until the primary dies, which is the one moment nobody wants to discover
+ * that its model name was retired too. This calls it directly — no safety net
+ * — so a bad key fails here instead of degrading quietly in production.
+ */
+async function checkFallback() {
+  const fallback = configuredFallback()
+
+  console.log("\nFailover")
+  if (!fallback) {
+    console.log("  NONE  AI_FALLBACK_PROVIDER is not set.")
+    console.log("        A rate limit or outage on the primary sends every new")
+    console.log("        lead to NEEDS_REVIEW with no draft until it clears.")
+    console.log("        Set a second provider on a different account:")
+    console.log('          AI_FALLBACK_PROVIDER="groq"')
+    console.log('          GROQ_API_KEY="..."   # https://console.groq.com/keys')
+    return
+  }
+
+  try {
+    const result = await probeProvider(fallback, {
+      system: ANALYST_SYSTEM_PROMPT,
+      user: `Lead information:\n\n"""\n${SAMPLE}\n"""`,
+      schema: {
+        type: "object",
+        required: ["items", "context_notes"],
+        properties: {
+          items: { type: "array", items: { type: "object" } },
+          context_notes: { type: "array", items: { type: "string" } },
+        },
+      },
+      maxOutputTokens: 2048,
+    })
+    console.log(
+      `  PASS  ${result.provider}:${result.model} answered in ${result.durationMs}ms`,
+    )
+    console.log("        The primary can fail without leads going unanalysed.")
+  } catch (error) {
+    const detail =
+      error instanceof Error ? error.message.split("\n")[0] : String(error)
+    console.log(`  FAIL  ${fallback} did not answer.`)
+    console.log(`        ${detail.slice(0, 160)}`)
+    console.log("        The failover would not catch anything today.")
+    process.exitCode = 1
+  }
 }
 
 function truncate(text: string, max: number): string {
