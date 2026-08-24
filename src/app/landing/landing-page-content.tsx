@@ -32,7 +32,7 @@ export function LandingPageContent({ signedIn = false }: { signedIn?: boolean })
         <PricingSection />
         <FaqSection />
         <CTASection />
-        <ContactSection />
+        <ContactSection signedIn={signedIn} />
       </main>
 
       {/* Footer */}
