@@ -224,41 +224,62 @@ async function callGemini(req: GenerateRequest): Promise<GenerateResult> {
   const started = Date.now()
 
   /**
-   * Turn thinking off on the 2.5 flash models.
+   * Hold thinking down.
    *
-   * They think by default, and thinking tokens come out of `maxOutputTokens` —
-   * so the model can spend the entire budget reasoning, return an empty text
-   * part with finishReason MAX_TOKENS, and produce a 200 that contains no
-   * answer. Extraction is a transcription job with a fixed schema; there is
-   * nothing here worth thinking about, and paying for it in the same budget as
-   * the response is how this call silently returns nothing.
+   * Gemini models think by default and thinking tokens are drawn from
+   * `maxOutputTokens`, so the model can spend most of the budget reasoning and
+   * return a truncated — or empty — answer. Observed live on 3.6-flash: valid
+   * JSON that simply stopped at character 121.
    *
-   * Only flash accepts a zero budget — 2.5 Pro enforces a floor — so Pro keeps
-   * its default and is given headroom instead.
+   * Extraction is transcription against a fixed schema. There is nothing here
+   * worth thinking about, and paying for it out of the same budget as the
+   * response is how this call returns half an object.
+   *
+   * The knob differs by family — 2.5 takes a numeric `thinkingConfig.budget`,
+   * 3.x takes a `thinkingLevel` — so rather than trust a version regex to know
+   * which is which, an unrecognised-field 400 falls back to a plain request.
+   * Being wrong then costs a retry instead of the whole extraction.
    */
-  const thinks = /2\.5/.test(model)
-  const canDisableThinking = thinks && /flash/i.test(model)
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+  const headers = { "x-goog-api-key": key }
 
-  const data = await postJson(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    { "x-goog-api-key": key },
-    {
-      systemInstruction: { parts: [{ text: req.system }] },
-      contents: [{ role: "user", parts: [{ text: req.user }] }],
-      generationConfig: {
-        temperature: 0,
-        // Headroom, because a truncated response is indistinguishable from a
-        // refusal by the time it reaches the parser.
-        maxOutputTokens: req.maxOutputTokens ?? 4096,
-        responseMimeType: "application/json",
-        responseSchema: toGeminiSchema(req.schema),
-        ...(canDisableThinking
-          ? { thinkingConfig: { thinkingBudget: 0 } }
-          : {}),
-      },
-    },
-    "gemini",
-  )
+  const generationConfig: Record<string, unknown> = {
+    temperature: 0,
+    // Headroom: a truncated response is indistinguishable from a refusal by
+    // the time it reaches the parser.
+    maxOutputTokens: req.maxOutputTokens ?? 8192,
+    responseMimeType: "application/json",
+    responseSchema: toGeminiSchema(req.schema),
+  }
+
+  const thinkingOverride: Record<string, unknown> | null = /2\.5/.test(model)
+    ? /flash/i.test(model)
+      ? { thinkingConfig: { thinkingBudget: 0 } } // Pro enforces a floor
+      : null
+    : { thinkingLevel: "low" }
+
+  const body = (extra: Record<string, unknown> | null) => ({
+    systemInstruction: { parts: [{ text: req.system }] },
+    contents: [{ role: "user", parts: [{ text: req.user }] }],
+    generationConfig: { ...generationConfig, ...(extra ?? {}) },
+  })
+
+  let data: Record<string, unknown>
+  try {
+    data = await postJson(url, headers, body(thinkingOverride), "gemini")
+  } catch (error) {
+    const rejectedTheKnob =
+      thinkingOverride !== null &&
+      error instanceof ProviderError &&
+      /returned 400/.test(error.message)
+
+    if (!rejectedTheKnob) throw error
+
+    console.warn(
+      `[ai] gemini rejected the thinking control for "${model}"; retrying without it`,
+    )
+    data = await postJson(url, headers, body(null), "gemini")
+  }
 
   const candidates = data.candidates as
     | Array<{
@@ -278,19 +299,38 @@ async function callGemini(req: GenerateRequest): Promise<GenerateResult> {
    * three specific things worth telling apart: the budget went on thinking,
    * a safety filter blocked the answer, or the response was cut off.
    */
-  if (!text.trim()) {
-    const reason = candidate?.finishReason ?? "no candidates returned"
-    const thinkingTokens = usage?.thoughtsTokenCount
-    const detail =
-      thinkingTokens && thinkingTokens > 0
-        ? ` ${thinkingTokens} tokens went to thinking.`
-        : ""
+  const finishReason = candidate?.finishReason ?? "no candidates returned"
+  const thinkingTokens = usage?.thoughtsTokenCount
+  const thinkingNote =
+    thinkingTokens && thinkingTokens > 0
+      ? ` ${thinkingTokens} of the output budget went to thinking.`
+      : ""
 
+  if (!text.trim()) {
     throw new ProviderError(
-      `gemini returned an empty response (finishReason=${reason}).${detail}` +
+      `gemini returned an empty response (finishReason=${finishReason}).${thinkingNote}` +
         ` Model "${model}" may not exist for this key, or the output budget was exhausted.`,
       "gemini",
-      reason === "MAX_TOKENS",
+      finishReason === "MAX_TOKENS",
+    )
+  }
+
+  /**
+   * Truncation deserves the same treatment as an empty body.
+   *
+   * A response cut off mid-object is still *text*, so it reaches `extractJson`
+   * and surfaces as "Expected ',' or ']' after array element at position 121".
+   * That reads like the model emitted malformed JSON, when in fact it emitted
+   * correct JSON and was stopped partway. Those call for opposite fixes —
+   * raise the budget versus change the prompt — so they must not share a
+   * message.
+   */
+  if (finishReason === "MAX_TOKENS") {
+    throw new ProviderError(
+      `gemini hit the output limit and returned ${text.length} characters of ` +
+        `incomplete JSON.${thinkingNote} Raise maxOutputTokens or reduce thinking.`,
+      "gemini",
+      true,
     )
   }
 
