@@ -1,22 +1,16 @@
-"use client";
+import { redirect } from "next/navigation"
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { isSignedIn } from "@/lib/auth/session"
 
-export default function HomePage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace("/dashboard");
-  }, [router]);
-
-  // Show a loading state while redirecting
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-        <p className="text-muted-foreground mt-2">Redirecting to dashboard...</p>
-      </div>
-    </div>
-  );
+/**
+ * The front door.
+ *
+ * A signed-in user is here to work, so they go to the pipeline. Everyone else
+ * meets the marketing site, which is where the sign-in lives. This replaced a
+ * client-side redirect that sent every visitor straight to /dashboard — with
+ * the route gate in place that would have bounced a first-time visitor through
+ * a spinner to a sign-in page, having never seen the product being sold.
+ */
+export default async function RootPage() {
+  redirect((await isSignedIn()) ? "/dashboard" : "/landing")
 }

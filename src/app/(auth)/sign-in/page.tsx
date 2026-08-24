@@ -2,7 +2,17 @@ import { LoginForm1 } from "./components/login-form-1"
 import { Logo } from "@/components/logo"
 import Link from "next/link"
 
-export default function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const params = await searchParams
+  const raw = Array.isArray(params.next) ? params.next[0] : params.next
+  // Only same-origin paths, so the redirect cannot be pointed off-site.
+  const next =
+    raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/dashboard"
+
   return (
     <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
@@ -12,7 +22,7 @@ export default function Page() {
           </div>
           Brightpath Solutions
         </Link>
-        <LoginForm1 />
+        <LoginForm1 next={next} />
       </div>
     </div>
   )

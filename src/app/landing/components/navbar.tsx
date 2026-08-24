@@ -72,7 +72,11 @@ const smoothScrollTo = (targetId: string) => {
   }
 }
 
-export function LandingNavbar() {
+/**
+ * `signedIn` comes from the server page, which reads the session cookie. The
+ * navbar cannot read it itself — the cookie is httpOnly, deliberately.
+ */
+export function LandingNavbar({ signedIn = false }: { signedIn?: boolean }) {
   const [isOpen, setIsOpen] = useState(false)
   const [solutionsOpen, setSolutionsOpen] = useState(false)
   const { setTheme, theme } = useTheme()
@@ -132,18 +136,28 @@ export function LandingNavbar() {
               <Mail className="h-5 w-5" />
             </a>
           </Button>
-          <Button variant="outline" asChild className="cursor-pointer">
-            <Link href="/dashboard" target="_blank" rel="noopener noreferrer">
-              <LayoutDashboard className="h-4 w-4 mr-2" />
-              Dashboard
-            </Link>
-          </Button>
-          <Button variant="ghost" asChild className="cursor-pointer">
-            <Link href="/sign-in">Sign In</Link>
-          </Button>
-          <Button asChild className="cursor-pointer">
-            <Link href="/sign-up">Get Started</Link>
-          </Button>
+          {/*
+            The dashboard is only offered once there is a session to open it
+            with. Showing it to a signed-out visitor promises a door that the
+            route gate would immediately close in their face.
+          */}
+          {signedIn ? (
+            <Button asChild className="cursor-pointer">
+              <Link href="/dashboard">
+                <LayoutDashboard className="h-4 w-4 mr-2" />
+                Dashboard
+              </Link>
+            </Button>
+          ) : (
+            <>
+              <Button variant="ghost" asChild className="cursor-pointer">
+                <Link href="/sign-in">Sign In</Link>
+              </Button>
+              <Button asChild className="cursor-pointer">
+                <Link href="/sign-in">Get Started</Link>
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Mobile Menu */}
@@ -249,21 +263,23 @@ export function LandingNavbar() {
 
                 {/* Primary Actions */}
                 <div className="space-y-3">
-                  <Button variant="outline" size="lg" asChild className="w-full cursor-pointer">
-                    <Link href="/dashboard">
-                      <LayoutDashboard className="size-4" />
-                      Dashboard
-                    </Link>
-                  </Button>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button variant="outline" size="lg" asChild className="cursor-pointer">
-                      <Link href="/sign-in">Sign In</Link>
+                  {signedIn ? (
+                    <Button size="lg" asChild className="w-full cursor-pointer">
+                      <Link href="/dashboard">
+                        <LayoutDashboard className="size-4" />
+                        Dashboard
+                      </Link>
                     </Button>
-                    <Button asChild size="lg" className="cursor-pointer" >
-                      <Link href="/sign-up">Get Started</Link>
-                    </Button>
-                  </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button variant="outline" size="lg" asChild className="cursor-pointer">
+                        <Link href="/sign-in">Sign In</Link>
+                      </Button>
+                      <Button asChild size="lg" className="cursor-pointer">
+                        <Link href="/sign-in">Get Started</Link>
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

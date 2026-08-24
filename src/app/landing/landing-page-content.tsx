@@ -14,13 +14,13 @@ import { LandingFooter } from './components/footer'
 import { LandingThemeCustomizer, LandingThemeCustomizerTrigger } from './components/landing-theme-customizer'
 import { AboutSection } from './components/about-section'
 
-export function LandingPageContent() {
+export function LandingPageContent({ signedIn = false }: { signedIn?: boolean }) {
   const [themeCustomizerOpen, setThemeCustomizerOpen] = React.useState(false)
 
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <LandingNavbar />
+      <LandingNavbar signedIn={signedIn} />
 
       {/* Main Content */}
       <main>

@@ -9,6 +9,8 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
+import { signOut } from "@/lib/auth/actions"
+
 import { Logo } from "@/components/logo"
 import {
   DropdownMenu,
@@ -99,11 +101,19 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            {/*
+              A real sign-out: it clears the session cookie. The previous
+              version linked to /sign-in while leaving the session intact, so
+              the middleware sent you straight back to the dashboard and the
+              menu item appeared broken.
+            */}
             <DropdownMenuItem asChild className="cursor-pointer">
-              <Link href="/sign-in">
-                <LogOut />
-                Log out
-              </Link>
+              <form action={signOut}>
+                <button type="submit" className="flex w-full items-center gap-2">
+                  <LogOut />
+                  Log out
+                </button>
+              </form>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

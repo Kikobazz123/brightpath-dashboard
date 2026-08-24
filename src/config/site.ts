@@ -23,6 +23,18 @@ export const siteConfig = {
     avatar: "",
   },
 
+  /**
+   * The account the sign-in page arrives pre-filled with.
+   *
+   * Not a credential — nothing is checked. See `src/lib/auth/session.ts`: the
+   * gate exists so a visitor meets the marketing site first and enters the app
+   * deliberately, not to keep anyone out. Overridable with DEMO_SIGNIN_EMAIL.
+   */
+  demoSignIn: {
+    email: "Judges@buildfest.com",
+    password: "buildfest",
+  },
+
   /** Ghost buttons on the right of the dashboard header. */
   headerLinks: [
     { label: "Home", href: "/landing", external: false },
