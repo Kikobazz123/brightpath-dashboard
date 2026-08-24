@@ -102,6 +102,27 @@ ${colorConfig
 
 const ChartTooltip = RechartsPrimitive.Tooltip
 
+/**
+ * Recharts 3 stopped exposing `payload`, `label` and friends on the props type
+ * it derives for a `content` renderer — they are injected at runtime from chart
+ * context and excluded from the public type. Declaring the shape these two
+ * components actually read keeps them properly typed, where deriving from
+ * `ComponentProps<typeof Tooltip>` now resolves to a type without those keys.
+ */
+type ChartTooltipItem = {
+  dataKey?: string | number
+  name?: string | number
+  value?: string | number
+  color?: string
+  payload?: Record<string, unknown> & { fill?: string }
+}
+
+type ChartLegendItem = {
+  value?: string | number
+  dataKey?: string | number
+  color?: string
+}
+
 function ChartTooltipContent({
   active,
   payload,
@@ -116,14 +137,29 @@ function ChartTooltipContent({
   color,
   nameKey,
   labelKey,
-}: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
-  React.ComponentProps<"div"> & {
-    hideLabel?: boolean
-    hideIndicator?: boolean
-    indicator?: "line" | "dot" | "dashed"
-    nameKey?: string
-    labelKey?: string
-  }) {
+}: Omit<React.ComponentProps<"div">, "color"> & {
+  active?: boolean
+  payload?: ChartTooltipItem[]
+  label?: unknown
+  labelFormatter?: (
+    label: React.ReactNode,
+    payload: ChartTooltipItem[]
+  ) => React.ReactNode
+  labelClassName?: string
+  formatter?: (
+    value: NonNullable<ChartTooltipItem["value"]>,
+    name: NonNullable<ChartTooltipItem["name"]>,
+    item: ChartTooltipItem,
+    index: number,
+    itemPayload: ChartTooltipItem["payload"]
+  ) => React.ReactNode
+  color?: string
+  hideLabel?: boolean
+  hideIndicator?: boolean
+  indicator?: "line" | "dot" | "dashed"
+  nameKey?: string
+  labelKey?: string
+}) {
   const { config } = useChart()
 
   const tooltipLabel = React.useMemo(() => {
@@ -138,6 +174,9 @@ function ChartTooltipContent({
       !labelKey && typeof label === "string"
         ? config[label as keyof typeof config]?.label || label
         : itemConfig?.label
+
+    // `labelFormatter` is handed the resolved label; it may be a React node
+    // from the chart config, which is why it is not narrowed to a string.
 
     if (labelFormatter) {
       return (
@@ -180,11 +219,11 @@ function ChartTooltipContent({
         {payload.map((item, index) => {
           const key = `${nameKey || item.name || item.dataKey || "value"}`
           const itemConfig = getPayloadConfigFromPayload(config, item, key)
-          const indicatorColor = color || item.payload.fill || item.color
+          const indicatorColor = color || item.payload?.fill || item.color
 
           return (
             <div
-              key={item.dataKey}
+              key={item.dataKey ?? index}
               className={cn(
                 "[&>svg]:text-muted-foreground flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5",
                 indicator === "dot" && "items-center"
@@ -254,11 +293,12 @@ function ChartLegendContent({
   payload,
   verticalAlign = "bottom",
   nameKey,
-}: React.ComponentProps<"div"> &
-  Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
-    hideIcon?: boolean
-    nameKey?: string
-  }) {
+}: React.ComponentProps<"div"> & {
+  payload?: ChartLegendItem[]
+  verticalAlign?: "top" | "middle" | "bottom"
+  hideIcon?: boolean
+  nameKey?: string
+}) {
   const { config } = useChart()
 
   if (!payload?.length) {
@@ -273,13 +313,13 @@ function ChartLegendContent({
         className
       )}
     >
-      {payload.map((item) => {
+      {payload.map((item, index) => {
         const key = `${nameKey || item.dataKey || "value"}`
         const itemConfig = getPayloadConfigFromPayload(config, item, key)
 
         return (
           <div
-            key={item.value}
+            key={item.value ?? index}
             className={cn(
               "[&>svg]:text-muted-foreground flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3"
             )}

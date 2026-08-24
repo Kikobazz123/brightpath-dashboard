@@ -15,6 +15,8 @@ import {
   CreditCard,
   LayoutTemplate,
   Users,
+  Target,
+  UserPlus,
 } from "lucide-react"
 import Link from "next/link"
 import { Logo } from "@/components/logo"
@@ -36,24 +38,39 @@ import {
 const data = {
   user: siteConfig.user,
   navGroups: [
+    /**
+     * The assistant first. Everything below this group is template surface that
+     * came with the theme and is kept for reference — grouping it separately
+     * means a visitor can tell in one glance which screens are BrightPath.
+     */
     {
-      label: "Dashboards",
+      label: "Sales assistant",
       items: [
         {
-          title: "Dashboard 1",
+          title: "Pipeline",
           url: "/dashboard",
           icon: LayoutDashboard,
         },
+        {
+          title: "Leads",
+          url: "/leads",
+          icon: Target,
+        },
+        {
+          title: "Capture lead",
+          url: "/leads/new",
+          icon: UserPlus,
+        },
+      ],
+    },
+    {
+      label: "Template pages",
+      items: [
         {
           title: "Dashboard 2",
           url: "/dashboard-2",
           icon: LayoutPanelLeft,
         },
-      ],
-    },
-    {
-      label: "Apps",
-      items: [
         {
           title: "Mail",
           url: "/mail",

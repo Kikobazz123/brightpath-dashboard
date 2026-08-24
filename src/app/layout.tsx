@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 import { SidebarConfigProvider } from "@/contexts/sidebar-context";
 import { inter } from "@/lib/fonts";
 import { siteConfig } from "@/config/site";
@@ -26,6 +27,8 @@ export default function RootLayout({
           <SidebarConfigProvider>
             {children}
           </SidebarConfigProvider>
+          {/* Server Actions report success and failure here. */}
+          <Toaster richColors closeButton position="top-right" />
         </ThemeProvider>
       </body>
     </html>

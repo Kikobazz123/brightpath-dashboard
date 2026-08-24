@@ -130,12 +130,8 @@ export function DataTableToolbar<TData>({
                   value={priority.value}
                   className="cursor-pointer"
                 >
-                  <div className="flex items-center">
-                    {priority.icon && (
-                      <priority.icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                    )}
-                    {priority.label}
-                  </div>
+                  {/* Priorities carry no icon — unlike statuses, which do. */}
+                  <div className="flex items-center">{priority.label}</div>
                 </SelectItem>
               ))}
             </SelectContent>
