@@ -129,3 +129,90 @@ at `AIOS backup/brightpath-source-20260824-021844.tgz` (19 MB, excludes
 exception so the documented config template is tracked. Real values in
 `.env.local` — the Neon `DATABASE_URL` and the demo token — were never committed
 and are not on GitHub. `.env.example` contains placeholders only.
+
+---
+
+# Addendum — full-project audit (2026-08-24, after the second interruption)
+
+A disk-wide sweep was run to confirm nothing about this project lives outside
+the two repos.
+
+## What the sweep found
+
+**No stray code.** The only BrightPath-named things outside the repos are this
+project's memory files, the safety archive, a Windows recent-items shortcut, and
+the brief in Downloads. All application code was already committed and pushed.
+
+**The brief was not in version control.** `CLAUDE.md`, `BACKEND_SCOPE.md` and
+`BACKEND_BUILD_CHECKLIST.md` lived only in
+`C:\Users\USER\Downloads\Lordgen main files\Brightpath solution\`. They are the
+source of truth for the build and were one deleted folder away from being lost.
+They are now committed: `CLAUDE.md` at the repo root (so Claude Code loads it
+automatically) and the other two under `brief/`.
+
+**The case-study PDF is not on this machine.** `CLAUDE.md` calls "the BrightPath
+case study/PDF" the source of truth, but no such PDF exists anywhere in the user
+profile. It is presumably still in email or the competition portal. Worth saving
+into `brief/` so the repo is genuinely self-contained.
+
+## Project context recovered from session memory
+
+This is **AI BuildFest 2026, Track 1, Case Study 2** — a competition build.
+
+The original intent was that **both sessions share the single `admin-dashboard`
+repo**, split by path: backend owned `src/lib/**`, `src/app/api/v1/**`,
+`scripts/**`, `drizzle*`; frontend owned the landing page and
+`src/app/(dashboard)/**`. In practice the frontend session copied the tree to
+`admin-dashboard-ui` at 00:48 instead of working in place. Nothing was lost —
+the backend files are byte-identical across both — but it means
+`brightpath-dashboard` is the one repo the original plan called for, and
+`brightpath-backend` is a frozen snapshot rather than a parallel line of work.
+
+Neon project `brightpath` = `weathered-haze-95690617`.
+
+### The design decision the build rests on
+
+The model extracts *evidence* (each fact carrying the verbatim quote it came
+from); deterministic code in `src/lib/pipeline/scoring.ts` computes the score
+against `rubric.ts`. The brief demands explicit criteria and explainable scores,
+and a model-emitted number is neither — it drifts between runs and cannot be
+audited. It also makes the build nearly free to run.
+
+**Never move scoring into a prompt.** Policy changes belong in `rubric.ts` with a
+version bump. Two gates exist there because a plain weighted sum got them wrong:
+an explicit "no budget" disqualifies outright, and HIGH priority requires a
+*stated* problem.
+
+## Verification status
+
+`npx tsx scripts/verify-scoring.ts` — **18 passed, 0 failed** (run 2026-08-24).
+No database or network required. It confirms determinism across 200 runs,
+order-independence, rubric traceability, NEEDS_REVIEW on missing evidence, both
+gates, and that fabricated evidence is rejected by the contract.
+
+`npx tsx --env-file=.env.local scripts/verify-journey.ts` — **never run.** 20
+checks against a real database, self-cleaning. This is still the outstanding
+verification and the first thing to do on resuming.
+
+## Spec compliance check
+
+All ten API endpoints required by `CLAUDE.md` exist with the specified verbs,
+plus the optional `POST /webhooks/leads/{source}` and an extra `/stats` and
+`/leads/{id}/confirm-send`. All three specified tables exist in the schema:
+`leads`, `activities`, `analysisRuns`.
+
+Gaps against the brief, unchanged from above: no end-to-end run against a live
+database; access control is still a single shared demo token; observability is
+not evidenced; and the whole frontend half of "every frontend action maps to an
+API" is outstanding.
+
+## Operational note — the scripts have no npm entries
+
+`tsx` and `drizzle-kit` are installed but `package.json` still lists only
+`dev`/`build`/`start`/`lint`. Until entries are added, invoke the tooling
+directly:
+
+    npx tsx scripts/verify-scoring.ts
+    npx tsx --env-file=.env.local scripts/db-status.ts
+    npx tsx --env-file=.env.local scripts/seed.ts
+    npx tsx --env-file=.env.local scripts/verify-journey.ts
