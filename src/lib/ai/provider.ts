@@ -243,20 +243,33 @@ async function callGemini(req: GenerateRequest): Promise<GenerateResult> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
   const headers = { "x-goog-api-key": key }
 
-  const generationConfig: Record<string, unknown> = {
-    temperature: 0,
-    // Headroom: a truncated response is indistinguishable from a refusal by
-    // the time it reaches the parser.
-    maxOutputTokens: req.maxOutputTokens ?? 8192,
-    responseMimeType: "application/json",
-    responseSchema: toGeminiSchema(req.schema),
-  }
-
   const thinkingOverride: Record<string, unknown> | null = /2\.5/.test(model)
     ? /flash/i.test(model)
       ? { thinkingConfig: { thinkingBudget: 0 } } // Pro enforces a floor
       : null
     : { thinkingLevel: "low" }
+
+  /**
+   * Budget for thinking *on top of* the answer, never out of it.
+   *
+   * `maxOutputTokens` caps thinking and response together, but a caller asking
+   * for 2048 means 2048 of answer — it has no idea how much reasoning this
+   * particular model will do first. Subtracting one from the other is how the
+   * analyst got 12 characters of JSON back: 1963 of its 2048 went to thinking.
+   *
+   * So the adapter adds the headroom, because the adapter is what knows the
+   * model thinks. Capping thinking above still does most of the work; this is
+   * the belt to that pair of braces, and unused tokens cost nothing.
+   */
+  const answerBudget = req.maxOutputTokens ?? 2048
+  const thinkingHeadroom = thinkingOverride === null ? 0 : 6144
+
+  const generationConfig: Record<string, unknown> = {
+    temperature: 0,
+    maxOutputTokens: answerBudget + thinkingHeadroom,
+    responseMimeType: "application/json",
+    responseSchema: toGeminiSchema(req.schema),
+  }
 
   const body = (extra: Record<string, unknown> | null) => ({
     systemInstruction: { parts: [{ text: req.system }] },
