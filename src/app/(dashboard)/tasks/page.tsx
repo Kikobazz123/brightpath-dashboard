@@ -5,6 +5,7 @@ import { z } from "zod"
 import { ArrowUp, BarChart3, CheckCircle2, Clock, ListTodo } from "lucide-react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CountUp } from "@/components/motion/count-up"
 import { columns } from "./components/columns"
 import { DataTable } from "./components/data-table"
 import { taskSchema, type Task } from "./data/schema"
@@ -79,14 +80,14 @@ export default function TaskPage() {
       {/* Desktop view */}
       <div className="hidden h-full flex-1 flex-col space-y-6 px-4 md:px-6 md:flex">
         {/* Stats Cards */}
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        <div className="stagger-in grid gap-4 grid-cols-2 md:grid-cols-4">
           <Card>
             <CardContent>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Total Tasks</p>
                   <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold">{stats.total}</span>
+                    <span className="text-2xl font-bold"><CountUp value={String(stats.total)} /></span>
                     <span className="flex items-center gap-0.5 text-sm text-green-500">
                       <ArrowUp className="size-3.5" />
                       {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
@@ -106,7 +107,7 @@ export default function TaskPage() {
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Completed</p>
                   <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold">{stats.completed}</span>
+                    <span className="text-2xl font-bold"><CountUp value={String(stats.completed)} /></span>
                     <span className="flex items-center gap-0.5 text-sm text-green-500">
                       <ArrowUp className="size-3.5" />
                       {Math.round((stats.completed / stats.total) * 100)}%
@@ -126,7 +127,7 @@ export default function TaskPage() {
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">In Progress</p>
                   <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold">{stats.inProgress}</span>
+                    <span className="text-2xl font-bold"><CountUp value={String(stats.inProgress)} /></span>
                     <span className="flex items-center gap-0.5 text-sm text-green-500">
                       <ArrowUp className="size-3.5" />
                       {Math.round((stats.inProgress / stats.total) * 100)}%
@@ -146,7 +147,7 @@ export default function TaskPage() {
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Pending</p>
                   <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold">{stats.pending}</span>
+                    <span className="text-2xl font-bold"><CountUp value={String(stats.pending)} /></span>
                     <span className="flex items-center gap-0.5 text-sm text-orange-500">
                       <ArrowUp className="size-3.5" />
                       {Math.round((stats.pending / stats.total) * 100)}%

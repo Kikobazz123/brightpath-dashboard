@@ -16,7 +16,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { Mail, MessageCircle, Github, BookOpen } from 'lucide-react'
+import { Mail, Compass, LifeBuoy } from 'lucide-react'
+import { siteConfig } from '@/config/site'
 
 const contactFormSchema = z.object({
   firstName: z.string().min(2, {
@@ -61,10 +62,10 @@ export function ContactSection() {
         <div className="mx-auto max-w-2xl text-center mb-16">
           <Badge variant="outline" className="mb-4">Get In Touch</Badge>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
-            Need help or have questions?
+            Start with the problem
           </h2>
           <p className="text-lg text-muted-foreground">
-            Our team is here to help you get the most out of ShadcnStore. Choose the best way to reach out to us.
+            Tell us what is not working and we will tell you what it would take to fix it. No sales sequence, no discovery call about the discovery call.
           </p>
         </div>
 
@@ -74,17 +75,17 @@ export function ContactSection() {
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <MessageCircle className="h-5 w-5 text-primary" />
-                  Discord Community
+                  <Mail className="h-5 w-5 text-primary" />
+                  Email us directly
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-3">
-                  Join our active community for quick help and discussions with other developers.
+                  The fastest route. Describe the problem in your own words and you will get a reply from someone who can answer it.
                 </p>
                 <Button variant="outline" size="sm" className="cursor-pointer" asChild>
-                  <a href="https://discord.com/invite/XEQhPc9a6p" target="_blank" rel="noopener noreferrer">
-                    Join Discord
+                  <a href={`mailto:${siteConfig.email}`}>
+                    {siteConfig.email}
                   </a>
                 </Button>
               </CardContent>
@@ -93,17 +94,17 @@ export function ContactSection() {
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Github className="h-5 w-5 text-primary" />
-                  GitHub Issues
+                  <Compass className="h-5 w-5 text-primary" />
+                  Book discovery
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-3">
-                  Report bugs, request features, or contribute to our open source repository.
+                  Already know roughly what you need? Skip ahead to a fixed-price scoping engagement.
                 </p>
                 <Button variant="outline" size="sm" className="cursor-pointer" asChild>
-                  <a href="https://github.com/silicondeck/shadcn-dashboard-landing-template/issues" target="_blank" rel="noopener noreferrer">
-                    View on GitHub
+                  <a href="#pricing">
+                    See what it includes
                   </a>
                 </Button>
               </CardContent>
@@ -112,17 +113,17 @@ export function ContactSection() {
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-primary" />
-                  Documentation
+                  <LifeBuoy className="h-5 w-5 text-primary" />
+                  Existing client?
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-3">
-                  Browse our comprehensive guides, tutorials, and component documentation.
+                  If you are on a support retainer, use your usual channel so the request is tracked against your hours.
                 </p>
                 <Button variant="outline" size="sm" className="cursor-pointer" asChild>
-                  <a href="#">
-                    View Docs
+                  <a href="/sign-in">
+                    Client sign in
                   </a>
                 </Button>
               </CardContent>
@@ -189,7 +190,7 @@ export function ContactSection() {
                         <FormItem>
                           <FormLabel>Subject</FormLabel>
                           <FormControl>
-                            <Input placeholder="Component request, bug report, general inquiry..." {...field} />
+                            <Input placeholder="Internal tool, integration, something else..." {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -203,7 +204,7 @@ export function ContactSection() {
                           <FormLabel>Message</FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder="Tell us how we can help you with ShadcnStore components..."
+                              placeholder="What happens today, who it affects, and what you wish happened instead."
                               rows={10}
                               className="min-h-50"
                               {...field}

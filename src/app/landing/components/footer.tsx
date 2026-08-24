@@ -14,7 +14,8 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Logo } from '@/components/logo'
-import { Github, Twitter, Linkedin, Youtube, Heart } from 'lucide-react'
+import { Mail, Linkedin, Heart } from 'lucide-react'
+import { siteConfig } from '@/config/site'
 
 const newsletterSchema = z.object({
   email: z.string().email({
@@ -24,36 +25,35 @@ const newsletterSchema = z.object({
 
 const footerLinks = {
   product: [
-    { name: 'Features', href: '#features' },
-    { name: 'Pricing', href: '#pricing' },
-    { name: 'API', href: '#api' },
-    { name: 'Documentation', href: '#docs' },
+    { name: 'Internal tools', href: '#services' },
+    { name: 'Integrations', href: '#services' },
+    { name: 'Process automation', href: '#services' },
+    { name: 'Reporting', href: '#services' },
   ],
   company: [
-    { name: 'About', href: '#about' },
-    { name: 'Blog', href: '#blog' },
-    { name: 'Careers', href: '#careers' },
-    { name: 'Press', href: '#press' },
+    { name: 'How we work', href: '#about' },
+    { name: 'How we price', href: '#pricing' },
+    { name: 'Common questions', href: '#faq' },
+    { name: 'Contact', href: '#contact' },
   ],
   resources: [
-    { name: 'Help Center', href: '#help' },
-    { name: 'Community', href: '#community' },
-    { name: 'Guides', href: '#guides' },
-    { name: 'Webinars', href: '#webinars' },
+    { name: 'Discovery', href: '#pricing' },
+    { name: 'Project build', href: '#pricing' },
+    { name: 'Retained support', href: '#pricing' },
+    { name: 'Client sign in', href: '/sign-in' },
   ],
+  // TODO: these need real pages before launch. Any business site needs them;
+  // they are listed here as placeholders rather than silently omitted.
   legal: [
     { name: 'Privacy', href: '#privacy' },
     { name: 'Terms', href: '#terms' },
-    { name: 'Security', href: '#security' },
-    { name: 'Status', href: '#status' },
   ],
 }
 
 const socialLinks = [
-  { name: 'Twitter', href: '#', icon: Twitter },
-  { name: 'GitHub', href: 'https://github.com/silicondeck/shadcn-dashboard-landing-template', icon: Github },
+  { name: 'Email', href: `mailto:${siteConfig.email}`, icon: Mail },
+  // TODO: replace with the real company LinkedIn URL.
   { name: 'LinkedIn', href: '#', icon: Linkedin },
-  { name: 'YouTube', href: '#', icon: Youtube },
 ]
 
 export function LandingFooter() {
@@ -77,7 +77,7 @@ export function LandingFooter() {
         {/* Newsletter Section */}
         <div className="mb-16">
           <div className="mx-auto max-w-2xl text-center">
-            <h3 className="text-2xl font-bold mb-4">Stay updated</h3>
+            <h3 className="text-2xl font-bold mb-4">Occasional notes</h3>
             <p className="text-muted-foreground mb-6">
               Get the latest updates, articles, and resources sent to your inbox weekly.
             </p>
@@ -110,9 +110,9 @@ export function LandingFooter() {
           {/* Brand Column */}
           <div className="col-span-4 lg:col-span-2 max-w-2xl">
             <div className="flex items-center space-x-2 mb-4 max-lg:justify-center">
-              <a href="https://shadcnstore.com" target='_blank' className="flex items-center space-x-2 cursor-pointer">
+              <a href="#hero" className="flex items-center space-x-2 cursor-pointer">
                 <Logo size={32} />
-                <span className="font-bold text-xl">ShadcnStore</span>
+                <span className="font-bold text-xl">{siteConfig.name}</span>
               </a>
             </div>
             <p className="text-muted-foreground mb-6 max-lg:text-center max-lg:flex max-lg:justify-center">
@@ -136,7 +136,7 @@ export function LandingFooter() {
 
           {/* Links Columns */}
           <div className='max-md:col-span-2 lg:col-span-1'>
-            <h4 className="font-semibold mb-4">Product</h4>
+            <h4 className="font-semibold mb-4">Services</h4>
             <ul className="space-y-3">
               {footerLinks.product.map((link) => (
                 <li key={link.name}>
@@ -168,7 +168,7 @@ export function LandingFooter() {
           </div>
 
           <div className='max-md:col-span-2 lg:col-span-1'>
-            <h4 className="font-semibold mb-4">Resources</h4>
+            <h4 className="font-semibold mb-4">Engagements</h4>
             <ul className="space-y-3">
               {footerLinks.resources.map((link) => (
                 <li key={link.name}>
@@ -209,8 +209,8 @@ export function LandingFooter() {
               <span>Made with</span>
               <Heart className="h-4 w-4 text-red-500 fill-current" />
               <span>by</span>
-              <a href="https://shadcnstore.com" target='_blank' className="font-semibold text-foreground hover:text-primary transition-colors cursor-pointer">
-                ShadcnStore
+              <a href={`mailto:${siteConfig.email}`} className="font-semibold text-foreground hover:text-primary transition-colors cursor-pointer">
+                {siteConfig.name}
               </a>
             </div>
             <span className="hidden sm:inline">•</span>

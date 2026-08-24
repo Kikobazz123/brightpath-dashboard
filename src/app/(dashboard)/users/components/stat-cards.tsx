@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import {Users, CreditCard, UserCheck, Clock5, TrendingUp, TrendingDown, ArrowUpRight} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { CountUp } from "@/components/motion/count-up"
 import { cn } from '@/lib/utils'
 
 
@@ -37,7 +38,7 @@ const performanceMetrics = [
 
 export function StatCards() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="stagger-in grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {performanceMetrics.map((metric, index) => (
         <Card key={index} className='border'>
           <CardContent className='space-y-4'>
@@ -68,7 +69,7 @@ export function StatCards() {
 
             <div className='space-y-2'>
               <p className='text-muted-foreground text-sm font-medium'>{metric.title}</p>
-              <div className='text-2xl font-bold'>{metric.current}</div>
+              <div className='text-2xl font-bold'><CountUp value={metric.current} /></div>
               <div className='text-muted-foreground flex items-center gap-2 text-sm'>
                 <span>from {metric.previous}</span>
                 <ArrowUpRight className='size-3' />

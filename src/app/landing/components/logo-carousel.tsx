@@ -43,20 +43,15 @@ const SimpleIcon = ({ iconSlug, size = 24 }: { iconSlug: string; size?: number }
   )
 }
 
-// Tech companies data
-const techCompanies = [
-  { name: 'Shopify', id: 'shopify' },
-  { name: 'Netflix', id: 'netflix' },
-  { name: 'Spotify', id: 'spotify' },
-  { name: 'Airbnb', id: 'airbnb' },
-  { name: 'Dropbox', id: 'dropbox' },
+// Platforms we build against. Six items; the scroll keyframe in
+// globals.css is sized to match (6 * 12rem = 72rem).
+const platforms = [
   { name: 'Stripe', id: 'stripe' },
-  { name: 'Google', id: 'google' },
-  { name: 'Apple', id: 'apple' },
-  { name: 'Meta', id: 'meta' },
-  { name: 'Tesla', id: 'tesla' },
-  { name: 'Salesforce', id: 'salesforce' },
   { name: 'GitHub', id: 'github' },
+  { name: 'Google', id: 'google' },
+  { name: 'Shopify', id: 'shopify' },
+  { name: 'Salesforce', id: 'salesforce' },
+  { name: 'Dropbox', id: 'dropbox' },
 ] as const
 
 export function LogoCarousel() {
@@ -65,7 +60,7 @@ export function LogoCarousel() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center">
           <p className="text-sm font-medium text-muted-foreground mb-8">
-            Trusted by leading companies worldwide
+            Platforms we integrate with
           </p>
 
           {/* Logo Carousel with Fade Effect */}
@@ -80,7 +75,7 @@ export function LogoCarousel() {
             <div className="overflow-hidden">
               <div className="flex animate-logo-scroll space-x-8 sm:space-x-12">
                 {/* First set of logos */}
-                {techCompanies.map((company, index) => (
+                {platforms.map((company, index) => (
                   <Card
                     key={`first-${index}`}
                     className="flex-shrink-0 flex items-center justify-center h-16 w-40 opacity-60 hover:opacity-100 transition-opacity duration-300 border-0 shadow-none bg-transparent"
@@ -94,7 +89,7 @@ export function LogoCarousel() {
                   </Card>
                 ))}
                 {/* Second set for seamless loop - identical to first */}
-                {techCompanies.map((company, index) => (
+                {platforms.map((company, index) => (
                   <Card
                     key={`second-${index}`}
                     className="flex-shrink-0 flex items-center justify-center h-16 w-40 opacity-60 hover:opacity-100 transition-opacity duration-300 border-0 shadow-none bg-transparent"

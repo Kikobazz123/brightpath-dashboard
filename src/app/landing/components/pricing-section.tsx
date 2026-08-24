@@ -5,59 +5,73 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useState } from 'react'
+import { siteConfig } from '@/config/site'
 
+/*
+ * Every price below is a PLACEHOLDER.
+ *
+ * Rates are the one thing on this page that must not be guessed, so they are
+ * bracketed rather than invented. Replace the `monthly` / `annual` strings
+ * with your real figures and delete this comment.
+ *
+ * `billingSensitive: false` means the tier ignores the monthly/annual toggle
+ * and shows as a one-off engagement instead.
+ */
 const plans = [
   {
-    name: 'Free',
-    description: 'Perfect for getting started with essential components',
-    monthlyPrice: 0,
-    yearlyPrice: 0,
+    name: 'Discovery',
+    description: 'A fixed-price piece of work that ends in a plan you can act on',
+    monthly: '[PRICE]',
+    annual: '[PRICE]',
+    billingSensitive: false,
+    note: 'Fixed price, one-off',
     features: [
-      'Access to 50+ free components',
-      'Basic dashboard templates',
-      'Community support',
-      'GitHub repository access',
-      'Documentation and guides'
+      'Structured review of the current process',
+      'Written scope and technical approach',
+      'Build estimate with assumptions stated',
+      'Recommendation even if that is "do not build"',
+      'Credited against the project if you proceed'
     ],
-    cta: 'Get Started',
+    cta: 'Book discovery',
     popular: false
   },
   {
-    name: 'Pro',
-    description: 'For developers who need premium templates and components',
-    monthlyPrice: 19,
-    yearlyPrice: 15,
+    name: 'Project build',
+    description: 'Design, build and launch of an agreed scope of work',
+    monthly: '[PRICE]',
+    annual: '[PRICE]',
+    billingSensitive: false,
+    note: 'Fixed price, from',
     features: [
-      'Premium template collection',
-      'Advanced dashboard layouts',
-      'Priority support',
-      'Commercial use license',
-      'Early access to new releases',
-      'Figma design files',
-      'Custom component requests',
-      'Direct developer access',
-      'Exclusive design resources'
+      'Scope fixed before work begins',
+      'Weekly working software, not status decks',
+      'One named point of contact throughout',
+      'Handover documentation you can act on',
+      'Source code and infrastructure in your accounts',
+      'Post-launch fixes included for an agreed window'
     ],
-    cta: 'Get Started',
+    cta: 'Discuss a project',
     popular: true,
-    includesPrevious: 'All Free features, plus'
+    includesPrevious: 'Everything in Discovery, plus'
   },
   {
-    name: 'Lifetime',
-    description: 'One-time payment for lifetime access to everything',
-    monthlyPrice: 299,
-    yearlyPrice: 299,
+    name: 'Retained support',
+    description: 'Ongoing development and maintenance at a predictable rate',
+    monthly: '[PRICE]',
+    annual: '[PRICE]',
+    billingSensitive: true,
+    note: 'Per month',
     features: [
-      'Lifetime updates and support',
-      'Private Discord channel',
-      'No recurring fees ever',
-      'Future template access',
-      'VIP support priority',
-      'Exclusive beta features'
+      'Agreed block of development time each month',
+      'Dependency patching and backup verification',
+      'Defined response time for urgent issues',
+      'Quarterly review of cost and performance',
+      'Roll unused time into the following month',
+      'Thirty days notice, no long lock-in'
     ],
-    cta: 'Get Started',
+    cta: 'Talk about support',
     popular: false,
-    includesPrevious: 'All Pro features, plus'
+    includesPrevious: 'Suitable after any build, plus'
   }
 ]
 
@@ -69,12 +83,14 @@ export function PricingSection() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="mx-auto max-w-2xl text-center mb-12">
-          <Badge variant="outline" className="mb-4">Pricing Plans</Badge>
+          <Badge variant="outline" className="mb-4">How we price</Badge>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
-            Choose your plan
+            Three ways to start
           </h2>
           <p className="text-lg text-muted-foreground mb-8">
-            Start building with our free components or upgrade to Pro for access to premium templates and advanced features.
+            Most clients begin with discovery, because a real estimate needs a
+            real scope. If you already know what you need, skip straight to a
+            project or a support retainer.
           </p>
 
           {/* Billing Toggle */}
@@ -101,7 +117,7 @@ export function PricingSection() {
           </div>
 
           <p className="text-sm text-muted-foreground">
-            <span className="text-primary font-semibold">Save 20%</span> On Annual Billing
+            <span className="text-primary font-semibold">Save [X]%</span> on annual retainers
           </p>
         </div>
 
@@ -127,22 +143,17 @@ export function PricingSection() {
                   {/* Pricing */}
                   <div>
                     <div className="text-4xl font-bold mb-1">
-                      {plan.name === 'Lifetime' ? (
-                        `$${plan.monthlyPrice}`
-                      ) : plan.name === 'Free' ? (
-                        '$0'
-                      ) : (
-                        `$${isYearly ? plan.yearlyPrice : plan.monthlyPrice}`
-                      )}
+                      {plan.billingSensitive && isYearly ? plan.annual : plan.monthly}
                     </div>
                     <div className="text-muted-foreground text-sm">
-                      {plan.name === 'Lifetime' ? 'One-time payment' : 'Per month'}
+                      {plan.billingSensitive && isYearly ? 'Per month, billed annually' : plan.note}
                     </div>
                   </div>
 
                   {/* CTA Button */}
                   <div>
                     <Button
+                      asChild
                       className={`w-full cursor-pointer my-2 ${
                         plan.popular
                           ? 'shadow-md border-[0.5px] border-white/25 shadow-black/20 bg-primary ring-1 ring-primary/15 text-primary-foreground hover:bg-primary/90'
@@ -150,7 +161,9 @@ export function PricingSection() {
                       }`}
                       variant={plan.popular ? 'default' : 'secondary'}
                     >
-                      {plan.cta}
+                      <a href={`mailto:${siteConfig.email}?subject=${encodeURIComponent(plan.name)}`}>
+                        {plan.cta}
+                      </a>
                     </Button>
                   </div>
 
@@ -176,13 +189,13 @@ export function PricingSection() {
           </div>
         </div>
 
-        {/* Enterprise Note */}
+        {/* Bespoke note */}
         <div className="mt-16 text-center">
           <p className="text-muted-foreground">
-            Need custom components or have questions? {' '}
+            Something that does not fit these three? {' '}
             <Button variant="link" className="p-0 h-auto cursor-pointer" asChild>
               <a href="#contact">
-                Contact our team
+                Tell us what you need
               </a>
             </Button>
           </p>

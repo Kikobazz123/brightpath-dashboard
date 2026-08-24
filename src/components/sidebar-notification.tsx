@@ -5,6 +5,7 @@ import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Logo } from "./logo"
+import { siteConfig } from "@/config/site"
 
 export function SidebarNotification() {
   const [isVisible, setIsVisible] = React.useState(true)
@@ -23,33 +24,21 @@ export function SidebarNotification() {
           <X className="h-3 w-3" />
           <span className="sr-only">Close notification</span>
         </Button>
-        
+
         <div className="pr-6">
           <h3 className="flex items-center gap-3 font-semibold text-neutral-900 dark:text-neutral-100 mb-2 mt-1">
             <Logo size={42} className="-mt-1" />
-            <div>
-              Welcome to{" "}
-              <a 
-                href="https://shadcnstore.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                ShadcnStore
-              </a>
-            </div>
+            <div>Welcome to {siteConfig.shortName}</div>
           </h3>
           <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-relaxed">
-            Explore our premium Shadcn UI{" "}
-            <a 
-              href="https://shadcnstore.com/blocks" 
-              target="_blank" 
-              rel="noopener noreferrer"
+            {siteConfig.tagline}.{" "}
+            <a
+              href={`mailto:${siteConfig.email}`}
               className="text-primary underline"
             >
-              blocks
+              Get in touch
             </a>{" "}
-            to build your next project faster.
+            to talk through your project.
           </p>
         </div>
       </CardContent>

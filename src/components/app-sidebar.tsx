@@ -19,6 +19,7 @@ import {
 import Link from "next/link"
 import { Logo } from "@/components/logo"
 import { SidebarNotification } from "@/components/sidebar-notification"
+import { siteConfig } from "@/config/site"
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
@@ -33,11 +34,7 @@ import {
 } from "@/components/ui/sidebar"
 
 const data = {
-  user: {
-    name: "ShadcnStore",
-    email: "store@example.com",
-    avatar: "",
-  },
+  user: siteConfig.user,
   navGroups: [
     {
       label: "Dashboards",
@@ -221,8 +218,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <Logo size={24} className="text-current" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">ShadcnStore</span>
-                  <span className="truncate text-xs">Admin Dashboard</span>
+                  <span className="truncate font-medium">{siteConfig.name}</span>
+                  <span className="truncate text-xs">{siteConfig.sidebarSubtitle}</span>
                 </div>
               </Link>
             </SidebarMenuButton>

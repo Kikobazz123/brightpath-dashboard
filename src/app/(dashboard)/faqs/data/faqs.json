@@ -1,8 +1,8 @@
 [
   {
     "id": 1,
-    "question": "What is ShadcnStore Admin?",
-    "answer": "ShadcnStore Admin is a comprehensive admin dashboard template built with React, TypeScript, and shadcn/ui components. It provides a complete solution for managing your e-commerce store or business operations.",
+    "question": "What is the Brightpath client portal?",
+    "answer": "The portal is where Brightpath Solutions clients follow project progress, raise support requests against their retainer, and find handover documentation for the systems we have built for them.",
     "category": "General"
   },
   {
@@ -13,8 +13,8 @@
   },
   {
     "id": 3,
-    "question": "Do you offer a free trial?",
-    "answer": "Yes, we offer a 14-day free trial for all new users. No credit card is required to start the trial, and you can explore all features during this period.",
+    "question": "Do you offer a trial engagement?",
+    "answer": "Discovery is the closest equivalent. It is a fixed-price piece of work that ends in a written scope and an estimate, and it is credited against the project if you decide to go ahead. There is no obligation to build.",
     "category": "General"
   },
   {
@@ -26,7 +26,7 @@
   {
     "id": 5,
     "question": "How do I contact support?",
-    "answer": "You can contact our support team through the support page, by email at support@shadcnstore.com, or through the live chat feature available 24/7.",
+    "answer": "Email us at Zaxellimited360@gmail.com. If you are on a support retainer, use the channel agreed in your engagement so the request is tracked against your hours.",
     "category": "General"
   },
   {
@@ -104,7 +104,7 @@
   {
     "id": 18,
     "question": "Do you offer refunds?",
-    "answer": "We offer a 30-day money-back guarantee for all plans. If you're not satisfied, contact our support team for a full refund within 30 days of purchase.",
+    "answer": "Refund and cancellation terms are set out in your engagement agreement. [CONFIRM YOUR POLICY HERE BEFORE PUBLISHING.]",
     "category": "Billing"
   },
   {
@@ -188,7 +188,7 @@
   {
     "id": 32,
     "question": "How do you handle my personal data?",
-    "answer": "We follow strict data protection policies and comply with GDPR, CCPA, and other privacy regulations. Your personal data is never shared with third parties without your consent.",
+    "answer": "Personal data is handled under a written data processing agreement specific to each engagement. [CONFIRM WHICH REGULATIONS APPLY TO YOU, for example UK GDPR, BEFORE PUBLISHING.]",
     "category": "Privacy"
   },
   {
@@ -212,13 +212,13 @@
   {
     "id": 36,
     "question": "Is my data encrypted?",
-    "answer": "Yes, all data is encrypted both in transit (using TLS 1.3) and at rest (using AES-256 encryption). We use industry-standard security practices to protect your information.",
+    "answer": "Data is encrypted in transit and at rest on the infrastructure we deploy for you. [CONFIRM THE SPECIFIC STANDARDS FOR YOUR STACK BEFORE PUBLISHING.]",
     "category": "Privacy"
   },
   {
     "id": 37,
     "question": "How secure is my data?",
-    "answer": "We implement bank-level security with end-to-end encryption, regular security audits, and compliance with SOC 2 Type II standards. Your data security is our top priority.",
+    "answer": "We follow standard practice for access control, dependency patching, and backup verification on systems we run. [ADD YOUR SPECIFIC SECURITY COMMITMENTS. Only name a certification such as SOC 2 or ISO 27001 if you actually hold it.]",
     "category": "Security"
   },
   {
@@ -242,13 +242,13 @@
   {
     "id": 41,
     "question": "What support channels are available?",
-    "answer": "We offer email support, live chat, and phone support (for Enterprise customers). Our knowledge base and community forums are also available 24/7.",
+    "answer": "Email is the primary channel. Retainer clients also get the response time set out in their agreement. [ADD ANY OTHER CHANNELS YOU OFFER.]",
     "category": "Support"
   },
   {
     "id": 42,
     "question": "What are your support hours?",
-    "answer": "Email and chat support are available 24/7. Phone support for Enterprise customers is available Monday-Friday, 9 AM-6 PM in your local timezone.",
+    "answer": "[ADD YOUR SUPPORT HOURS.] Urgent issues for retainer clients follow the response time agreed in their engagement.",
     "category": "Support"
   },
   {

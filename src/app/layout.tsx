@@ -4,10 +4,14 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SidebarConfigProvider } from "@/contexts/sidebar-context";
 import { inter } from "@/lib/fonts";
+import { siteConfig } from "@/config/site";
 
 export const metadata: Metadata = {
-  title: "Shadcn Dashboard",
-  description: "A dashboard built with Next.js and shadcn/ui",
+  title: {
+    default: `${siteConfig.name} — ${siteConfig.sidebarSubtitle}`,
+    template: `%s — ${siteConfig.name}`,
+  },
+  description: siteConfig.tagline,
 };
 
 export default function RootLayout({

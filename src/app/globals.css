@@ -153,13 +153,15 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Logo carousel animation */
+/* Logo carousel animation.
+   The distance must equal exactly one full set of items, or the loop visibly
+   jumps on repeat. Keep this in step with the array in logo-carousel.tsx. */
 @keyframes logo-scroll {
   0% {
     transform: translateX(0);
   }
   100% {
-    transform: translateX(-144rem); /* 12 items * 12rem = 144rem */
+    transform: translateX(-72rem); /* 6 items * 12rem = 72rem */
   }
 }
 
@@ -169,4 +171,71 @@ html {
 
 .animate-logo-scroll:hover {
   animation-play-state: paused;
+}
+
+/* ==========================================================================
+   Motion layer
+   Route transitions live in the `template.tsx` files, which remount on every
+   navigation. Everything below is gated on prefers-reduced-motion so the
+   whole layer disappears for anyone who has asked for that.
+   ========================================================================== */
+
+@keyframes stagger-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Staggered entrance for a group of siblings: card grids, settings columns,
+ * stat rows. Applied to the CONTAINER, so children need no markup of their
+ * own and the delay ladder survives reordering.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .stagger-in > * {
+    animation: stagger-rise 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .stagger-in > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-in > *:nth-child(2) { animation-delay: 60ms; }
+  .stagger-in > *:nth-child(3) { animation-delay: 120ms; }
+  .stagger-in > *:nth-child(4) { animation-delay: 180ms; }
+  .stagger-in > *:nth-child(5) { animation-delay: 240ms; }
+  .stagger-in > *:nth-child(6) { animation-delay: 300ms; }
+  .stagger-in > *:nth-child(7) { animation-delay: 360ms; }
+  .stagger-in > *:nth-child(8) { animation-delay: 420ms; }
+
+  /* Past eight the ladder stops growing: a later card should not wait a
+     second and a half to appear. */
+  .stagger-in > *:nth-child(n + 9) { animation-delay: 480ms; }
+}
+
+/*
+ * Belt and braces. Tailwind's `motion-safe:` variant already gates the
+ * route transitions, and the stagger ladder is inside a no-preference
+ * query, but third-party components (Radix, Recharts, Vaul) animate on
+ * their own. This stops all of it at once.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-logo-scroll {
+    animation: none;
+  }
 }

@@ -1,62 +1,65 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card"
-import { Rocket, Blocks, LayoutDashboard, ArrowRight } from "lucide-react"
-import Image from "next/image"
+import { Compass, Mail, ArrowRight, LifeBuoy } from "lucide-react"
+import { siteConfig } from "@/config/site"
 
-
-const SHADCN_BLOCKS_URL = "https://shadcnstore.com/blocks"
-
+/**
+ * Floating consultation CTA.
+ *
+ * Upstream this was an "Upgrade to Pro" advert for the template author's
+ * component store. The visual treatment is kept because it is part of the
+ * design being reproduced; the content is now a real call to action.
+ *
+ * Positioning note: upstream pinned this at `bottom-8`, where it sat on top
+ * of table rows and calendar cells on /users, /tasks, /calendar and /mail.
+ * It now clears the footer and tucks out of the way on small screens, where
+ * the overlap was worst.
+ */
 export function UpgradeToProButton() {
-
+  const mailto = `mailto:${siteConfig.email}?subject=${encodeURIComponent("Project enquiry")}`
 
   return (
-    <div className="fixed z-50 bottom-8 right-4 md:right-6 lg:right-8 flex flex-col items-end gap-2">
+    <div className="fixed z-50 bottom-4 right-4 md:bottom-6 md:right-6 lg:right-8 flex flex-col items-end gap-2">
       <HoverCard openDelay={100} closeDelay={100}>
         <HoverCardTrigger asChild>
           <Button
             size="lg"
-            className="px-6 py-3 bg-gradient-to-br shadow-lg from-slate-900 cursor-pointer to-slate-400 text-white font-bold"
-            style={{ minWidth: 180 }} onClick={() => typeof window !== "undefined" && window.open(SHADCN_BLOCKS_URL, "_blank")}
+            className="px-5 py-3 bg-gradient-to-br shadow-lg from-slate-900 cursor-pointer to-slate-400 text-white font-bold"
+            asChild
           >
-            Upgrade to Pro
-            <Rocket size={30} className="ml-1" />
+            <a href={mailto}>
+              <span className="hidden sm:inline">Start a project</span>
+              <span className="sm:hidden">Enquire</span>
+              <Compass size={22} className="ml-1" />
+            </a>
           </Button>
         </HoverCardTrigger>
-        <HoverCardContent className="mb-3 w-90 rounded-xl shadow-2xl bg-background border border-border p-3 animate-in fade-in slide-in-from-bottom-4 relative mr-4 md:mr-6 lg:mr-8">
-          <div className="flex flex-col items-center text-center gap-3">
-            <a href={SHADCN_BLOCKS_URL} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
-              <Image src="/hero-images-container.png" alt="shadcn" width={300} height={200} />
-            </a>
-            <h3 className="font-bold text-lg flex items-center py-2 gap-2">
-              <Rocket size={18} className="text-primary" />
-              Unlock Premium Blocks
-              <Badge variant="destructive" className="text-xs px-2 py-0.5 rounded-full shadow">Live</Badge>
+        <HoverCardContent className="mb-3 w-80 rounded-xl shadow-2xl bg-background border border-border p-4 animate-in fade-in slide-in-from-bottom-4 relative mr-4 md:mr-6 lg:mr-8">
+          <div className="flex flex-col gap-3">
+            <h3 className="font-bold text-base flex items-center gap-2">
+              <Compass size={18} className="text-primary" />
+              Work with {siteConfig.shortName}
             </h3>
-            <p className="text-muted-foreground text-sm mb-4">
-              Get access to exclusive premium blocks and dashboards for your next project. Elevate your UI instantly!
+            <p className="text-muted-foreground text-sm">
+              {siteConfig.tagline}. Tell us what is not working and you will get
+              an honest read on whether it needs custom software at all.
             </p>
-            <div className="flex flex-row gap-2 w-full mt-2 justify-center">
-              <div className="relative w-1/2">
-                <a href={SHADCN_BLOCKS_URL} target="_blank" rel="noopener noreferrer">
-                  <Button className="w-full flex items-center justify-center cursor-pointer" variant="default">
-                    <Blocks size={16} />
-                    Pro Blocks
-                    <ArrowRight size={16} />
-                  </Button>
+            <div className="flex flex-col gap-2 pt-1">
+              <Button className="w-full justify-center" variant="default" asChild>
+                <a href={mailto}>
+                  <Mail size={16} className="mr-2" />
+                  Email us
+                  <ArrowRight size={16} className="ml-2" />
                 </a>
-              </div>
-              <div className="relative w-1/2">
-                <Button className="w-full flex items-center justify-center" variant="default" disabled>
-                  <LayoutDashboard size={16} />
-                  Pro Dashboards
-                </Button>
-                <span className="absolute -top-5 -right-1">
-                  <Badge variant="outline" className="bg-yellow-400 text-yellow-900 border-yellow-400 text-xs px-2 py-0.5 rounded-full shadow">Coming soon</Badge>
-                </span>
-              </div>
+              </Button>
+              <Button className="w-full justify-center" variant="outline" asChild>
+                <a href="/landing#pricing">
+                  <LifeBuoy size={16} className="mr-2" />
+                  How we price
+                </a>
+              </Button>
             </div>
           </div>
         </HoverCardContent>

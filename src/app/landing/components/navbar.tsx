@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Menu, Github, LayoutDashboard, ChevronDown, X, Moon, Sun } from 'lucide-react'
+import { Menu, Mail, LayoutDashboard, ChevronDown, X, Moon, Sun } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { siteConfig } from '@/config/site'
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -31,9 +32,9 @@ import { useTheme } from '@/hooks/use-theme'
 
 const navigationItems = [
   { name: 'Home', href: '#hero' },
-  { name: 'Features', href: '#features' },
-  { name: 'Solutions', href: '#features', hasMegaMenu: true },
-  { name: 'Team', href: '#team' },
+  { name: 'Services', href: '#services' },
+  { name: 'What we offer', href: '#services', hasMegaMenu: true },
+  { name: 'Approach', href: '#about' },
   { name: 'Pricing', href: '#pricing' },
   { name: 'FAQ', href: '#faq' },
   { name: 'Contact', href: '#contact' },
@@ -41,21 +42,21 @@ const navigationItems = [
 
 // Solutions menu items for mobile
 const solutionsItems = [
-  { title: 'Browse Products' },
-  { name: 'Free Blocks', href: '#free-blocks' },
-  { name: 'Premium Templates', href: '#premium-templates' },
-  { name: 'Admin Dashboards', href: '#admin-dashboards' },
-  { name: 'Landing Pages', href: '#landing-pages' },
-  { title: 'Categories' },
-  { name: 'E-commerce', href: '#ecommerce' },
-  { name: 'SaaS Dashboards', href: '#saas-dashboards' },
-  { name: 'Analytics', href: '#analytics' },
-  { name: 'Authentication', href: '#authentication' },
-  { title: 'Resources' },
-  { name: 'Documentation', href: '#docs' },
-  { name: 'Component Showcase', href: '#showcase' },
-  { name: 'GitHub Repository', href: '#github' },
-  { name: 'Design System', href: '#design-system' }
+  { title: 'Build' },
+  { name: 'Internal tools', href: '#services' },
+  { name: 'Integrations', href: '#services' },
+  { name: 'Process automation', href: '#services' },
+  { name: 'Reporting', href: '#services' },
+  { title: 'Support' },
+  { name: 'Discovery and scoping', href: '#pricing' },
+  { name: 'Ongoing development', href: '#pricing' },
+  { name: 'Maintenance and updates', href: '#services' },
+  { name: 'Performance review', href: '#services' },
+  { title: 'Company' },
+  { name: 'How we work', href: '#about' },
+  { name: 'How we price', href: '#pricing' },
+  { name: 'Common questions', href: '#faq' },
+  { name: 'Get in touch', href: '#contact' }
 ]
 
 // Smooth scroll function
@@ -81,10 +82,10 @@ export function LandingNavbar() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
         {/* Logo */}
         <div className="flex items-center space-x-2">
-          <Link href="https://shadcnstore.com" className="flex items-center space-x-2 cursor-pointer" target='_blank' rel="noopener noreferrer">
+          <Link href="#hero" className="flex items-center space-x-2 cursor-pointer">
             <Logo size={32} />
             <span className="font-bold">
-              ShadcnStore
+              {siteConfig.name}
             </span>
           </Link>
         </div>
@@ -127,8 +128,8 @@ export function LandingNavbar() {
         <div className="hidden xl:flex items-center space-x-2">
           <ModeToggle variant="ghost" />
           <Button variant="ghost" size="icon" asChild className="cursor-pointer">
-            <a href="https://github.com/silicondeck/shadcn-dashboard-landing-template" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
-              <Github className="h-5 w-5" />
+            <a href={`mailto:${siteConfig.email}`} aria-label={`Email ${siteConfig.name}`}>
+              <Mail className="h-5 w-5" />
             </a>
           </Button>
           <Button variant="outline" asChild className="cursor-pointer">
@@ -138,10 +139,10 @@ export function LandingNavbar() {
             </Link>
           </Button>
           <Button variant="ghost" asChild className="cursor-pointer">
-            <Link href="/auth/sign-in">Sign In</Link>
+            <Link href="/sign-in">Sign In</Link>
           </Button>
           <Button asChild className="cursor-pointer">
-            <Link href="/auth/sign-up">Get Started</Link>
+            <Link href="/sign-up">Get Started</Link>
           </Button>
         </div>
 
@@ -161,7 +162,7 @@ export function LandingNavbar() {
                   <div className="p-2 bg-primary/10 rounded-lg">
                     <Logo size={16} />
                   </div>
-                  <SheetTitle className="text-lg font-semibold">ShadcnStore</SheetTitle>
+                  <SheetTitle className="text-lg font-semibold">{siteConfig.name}</SheetTitle>
                   <div className="ml-auto flex items-center gap-2">
                     <Button
                       variant="ghost"
@@ -173,8 +174,8 @@ export function LandingNavbar() {
                       <Sun className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
                     </Button>
                     <Button variant="ghost" size="icon" asChild className="cursor-pointer h-8 w-8">
-                      <a href="https://github.com/silicondeck/shadcn-dashboard-landing-template" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
-                        <Github className="h-4 w-4" />
+                      <a href={`mailto:${siteConfig.email}`} aria-label={`Email ${siteConfig.name}`}>
+                        <Mail className="h-4 w-4" />
                       </a>
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="cursor-pointer h-8 w-8">
@@ -257,10 +258,10 @@ export function LandingNavbar() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <Button variant="outline" size="lg" asChild className="cursor-pointer">
-                      <Link href="/auth/sign-in">Sign In</Link>
+                      <Link href="/sign-in">Sign In</Link>
                     </Button>
                     <Button asChild size="lg" className="cursor-pointer" >
-                      <Link href="/auth/sign-up">Get Started</Link>
+                      <Link href="/sign-up">Get Started</Link>
                     </Button>
                   </div>
                 </div>

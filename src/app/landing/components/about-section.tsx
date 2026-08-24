@@ -4,28 +4,29 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { CardDecorator } from '@/components/ui/card-decorator'
-import { Github, Code, Palette, Layout, Crown } from 'lucide-react'
+import { Mail, Handshake, Ruler, LifeBuoy, MessagesSquare } from 'lucide-react'
+import { siteConfig } from '@/config/site'
 
 const values = [
   {
-    icon: Code,
-    title: 'Developer First',
-    description: 'Every component is built with the developer experience in mind, ensuring clean code and easy integration.'
+    icon: Handshake,
+    title: 'One team, start to finish',
+    description: 'The people who scope your project are the people who build it. Nothing is handed to a delivery team that was not in the room.'
   },
   {
-    icon: Palette,
-    title: 'Design Excellence',
-    description: 'We maintain the highest design standards, following shadcn/ui principles and modern UI patterns.'
+    icon: Ruler,
+    title: 'Scoped before quoted',
+    description: 'We work out what the thing actually is before putting a number on it, so the estimate you approve is the one you pay.'
   },
   {
-    icon: Layout,
-    title: 'Production Ready',
-    description: 'Battle-tested components used in real applications with proven performance and reliability across different environments.'
+    icon: MessagesSquare,
+    title: 'Plain language',
+    description: 'Progress reported in terms of what now works, not story points burned down. You should never need a translator to read an update.'
   },
   {
-    icon: Crown,
-    title: 'Premium Quality',
-    description: 'Hand-crafted with attention to detail and performance optimization, ensuring exceptional user experience and accessibility.'
+    icon: LifeBuoy,
+    title: 'Still here after launch',
+    description: 'Software is not finished when it ships. Support and iteration are part of the engagement, not a separate conversation.'
   }
 ]
 
@@ -36,19 +37,21 @@ export function AboutSection() {
         {/* Section Header */}
         <div className="mx-auto max-w-4xl text-center mb-16">
           <Badge variant="outline" className="mb-4">
-            About ShadcnStore
+            About {siteConfig.shortName}
           </Badge>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-6">
-            Built for developers, by developers
+            A small team that stays close to the work
           </h2>
           <p className="text-lg text-muted-foreground mb-8">
-            We&apos;re passionate about creating the best marketplace for shadcn/ui components and templates.
-            Our mission is to accelerate development and help developers build beautiful admin interfaces faster.
+            Growing businesses rarely need more software. They need the right
+            software, built by people who understood the problem first. We keep
+            engagements small enough to stay accountable for the outcome rather
+            than just the deliverable.
           </p>
         </div>
 
-        {/* Modern Values Grid with Enhanced Design */}
-        <div className="grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2 xl:grid-cols-4 mb-12">
+        {/* How we work */}
+        <div className="stagger-in grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2 xl:grid-cols-4 mb-12">
           {values.map((value, index) => (
             <Card key={index} className='group shadow-xs py-2'>
               <CardContent className='p-8'>
@@ -67,18 +70,20 @@ export function AboutSection() {
         {/* Call to Action */}
         <div className="mt-16 text-center">
           <div className="flex items-center justify-center gap-2 mb-6">
-            <span className="text-muted-foreground">❤️ Made with love for the developer community</span>
+            <span className="text-muted-foreground">
+              Not sure whether your problem needs custom software at all? Ask us. We will tell you if it does not.
+            </span>
           </div>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" className="cursor-pointer" asChild>
-              <a href="https://github.com/silicondeck/shadcn-dashboard-landing-template" target="_blank" rel="noopener noreferrer">
-                <Github className="mr-2 h-4 w-4" />
-                Star on GitHub
+              <a href={`mailto:${siteConfig.email}`}>
+                <Mail className="mr-2 h-4 w-4" />
+                Email us
               </a>
             </Button>
             <Button size="lg" variant="outline" className="cursor-pointer" asChild>
-              <a href="https://discord.com/invite/XEQhPc9a6p" target="_blank" rel="noopener noreferrer">
-                Join Discord Community
+              <a href="#contact">
+                Send a project brief
               </a>
             </Button>
           </div>
