@@ -1,0 +1,27 @@
+Refresh the Groq and OpenRouter model defaults; both were retired
+
+Third and fourth stale model names found today. With both fallback keys now
+valid in production, the chain reached them and each answered 404:
+
+  groq:       model llama-3.3-70b-versatile does not exist or you do not
+              have access to it
+  openrouter: No endpoints found for google/gemini-2.0-flash-exp:free
+
+Neither is an auth failure -- OpenRouter even returned a user_id -- so the keys
+are good and only the names were dead.
+
+  groq        llama-3.3-70b-versatile      -> openai/gpt-oss-120b
+  openrouter  google/gemini-2.0-flash-exp  -> z-ai/glm-5.2:free
+
+The OpenRouter replacement was taken from its live public catalogue rather than
+picked from memory, filtered to free models advertising structured-output
+support. Guessing a model name is what cost three deploy cycles this morning.
+
+The pattern is the point: three of this file's four model defaults were already
+retired within months of being written. They are all env-overridable, so a
+retirement is a Vercel edit rather than a deploy, and .env.example now carries
+the two commands that list what a given key can actually see.
+
+Verified: tsc clean, 12/12 failover, build clean.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

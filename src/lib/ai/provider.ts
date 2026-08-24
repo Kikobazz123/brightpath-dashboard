@@ -434,14 +434,24 @@ async function callOpenAiCompatible(
           key: env("GROQ_API_KEY"),
           keyName: "GROQ_API_KEY",
           url: "https://api.groq.com/openai/v1/chat/completions",
-          model: env("GROQ_MODEL", "llama-3.3-70b-versatile"),
+          /**
+           * llama-3.3-70b-versatile was the default and is gone — Groq now
+           * answers a 404 model_not_found for it. Third stale model name found
+           * in this codebase in one session, so treat every one of these as
+           * perishable: they are overridable by env var precisely so a
+           * retirement is a Vercel edit rather than a deploy.
+           */
+          model: env("GROQ_MODEL", "openai/gpt-oss-120b"),
           extraHeaders: {} as Record<string, string>,
         }
       : {
           key: env("OPENROUTER_API_KEY"),
           keyName: "OPENROUTER_API_KEY",
           url: "https://openrouter.ai/api/v1/chat/completions",
-          model: env("OPENROUTER_MODEL", "google/gemini-2.0-flash-exp:free"),
+          /** Chosen from OpenRouter's live catalogue as a free model that
+           * advertises structured-output support; the previous default had no
+           * endpoints left serving it. */
+          model: env("OPENROUTER_MODEL", "z-ai/glm-5.2:free"),
           extraHeaders: { "x-title": "BrightPath Sales Assistant" },
         }
 
