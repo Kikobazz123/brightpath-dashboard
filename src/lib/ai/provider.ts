@@ -213,7 +213,14 @@ function toGeminiSchema(node: unknown): unknown {
 async function callGemini(req: GenerateRequest): Promise<GenerateResult> {
   const key = env("GEMINI_API_KEY")
   if (!key) throw new ProviderError("GEMINI_API_KEY is not set", "gemini", false)
-  const model = env("GEMINI_MODEL", "gemini-2.5-flash")
+  /**
+   * `gemini-2.5-flash` was the default here and is now refused for new API
+   * keys — Google returns a 404 telling you to move to 3.6. Keys issued before
+   * the cutoff still work, which is exactly why this is worth a comment: the
+   * old value works on an established account and fails on a fresh one, so it
+   * looks like a broken key rather than a retired model.
+   */
+  const model = env("GEMINI_MODEL", "gemini-3.6-flash")
   const started = Date.now()
 
   /**
