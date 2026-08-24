@@ -500,6 +500,16 @@ export async function runFollowUp(tenantId: string, id: string): Promise<Lead> {
   await logActivity(tenantId, id, "follow_up_drafted", "ai:writer", {
     model: `${result.provider}:${result.model}`,
     grounded_in: result.draft.grounded_in,
+    /**
+     * Why the draft is a placeholder, when it is one.
+     *
+     * The analyst can put this in its evidence notes; a draft has nowhere to
+     * carry a note that would not read as part of the message. The timeline
+     * renders activity payloads already, so an operator looking at a stub
+     * draft can see whether the provider was rate limited, misconfigured, or
+     * simply absent — instead of a placeholder with no explanation attached.
+     */
+    ...(result.degradedReason ? { degraded_reason: result.degradedReason } : {}),
   })
 
   return getLead(tenantId, id)

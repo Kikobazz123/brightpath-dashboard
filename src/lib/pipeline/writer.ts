@@ -88,6 +88,15 @@ export interface WriteResult {
   inputTokens: number | null
   outputTokens: number | null
   durationMs: number
+  /**
+   * Why the stub answered instead of the configured provider, if it did.
+   *
+   * The analyst puts its equivalent into the evidence context notes, where the
+   * UI already shows it. A draft has nowhere comparable to put a note without
+   * it reading as part of the message, so this rides on the activity payload
+   * instead — see `runFollowUp`.
+   */
+  degradedReason?: string
 }
 
 export async function writeFollowUp(
@@ -139,6 +148,7 @@ export async function writeFollowUp(
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
       durationMs: result.durationMs,
+      degradedReason: result.degradedReason,
     }
   }
 
@@ -149,6 +159,7 @@ export async function writeFollowUp(
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
     durationMs: result.durationMs,
+    degradedReason: result.degradedReason,
   }
 }
 
