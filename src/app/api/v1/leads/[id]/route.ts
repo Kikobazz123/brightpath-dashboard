@@ -7,10 +7,11 @@ import {
   requireAuth,
 } from "@/lib/api/http"
 import { getLead, updateLead } from "@/lib/leads/service"
+import { observe } from "@/lib/api/observability"
 
 type Params = { params: Promise<{ id: string }> }
 
-export async function GET(request: Request, { params }: Params) {
+async function handleGET(request: Request, { params }: Params) {
   try {
     const auth = requireAuth(request)
     if (isResponse(auth)) return auth
@@ -21,7 +22,7 @@ export async function GET(request: Request, { params }: Params) {
   }
 }
 
-export async function PATCH(request: Request, { params }: Params) {
+async function handlePATCH(request: Request, { params }: Params) {
   try {
     const auth = requireAuth(request)
     if (isResponse(auth)) return auth
@@ -35,3 +36,8 @@ export async function PATCH(request: Request, { params }: Params) {
     return handleError(error)
   }
 }
+
+export const GET = observe("GET /api/v1/leads/[id]", handleGET)
+export const PATCH = observe("PATCH /api/v1/leads/[id]", handlePATCH)
+
+export const dynamic = "force-dynamic"

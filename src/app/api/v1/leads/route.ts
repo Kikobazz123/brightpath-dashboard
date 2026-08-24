@@ -3,7 +3,7 @@ import {
   listLeadsQuerySchema,
 } from "@/lib/contracts/leads"
 import {
-  fail,
+  failRateLimited,
   handleError,
   isResponse,
   ok,
@@ -11,6 +11,8 @@ import {
   parseQuery,
   requireAuth,
 } from "@/lib/api/http"
+import { observe } from "@/lib/api/observability"
+import { CAPTURE_LIMIT, clientKey, rateLimit } from "@/lib/api/rate-limit"
 import { createLead, listLeads, runFullPipeline } from "@/lib/leads/service"
 
 /**
@@ -20,22 +22,27 @@ import { createLead, listLeads, runFullPipeline } from "@/lib/leads/service"
  * posts to, and a visitor has no token. It can only ever create — it cannot
  * read, list, or modify anything — so the open door leads into an empty room.
  *
- * By default the full pipeline runs inline before responding. That costs a few
- * seconds but it is the entire point of the product: the lead is analysed,
- * scored, and has a drafted reply before the visitor has closed the tab.
- * Pass ?analyze=0 to capture only.
+ * It is rate limited, though, because the room is not free to enter: each call
+ * runs the full pipeline inline, so an unauthenticated loop here spends the
+ * day's model quota and stops real leads being analysed.
+ *
+ * By default the full pipeline runs before responding. That costs a few seconds
+ * but it is the entire point of the product: the lead is analysed, scored, and
+ * has a drafted reply before the visitor has closed the tab. Pass ?analyze=0 to
+ * capture only.
  */
-export async function POST(request: Request) {
+async function capture(request: Request) {
   try {
+    const limit = rateLimit(`capture:${clientKey(request)}`, CAPTURE_LIMIT)
+    if (!limit.allowed) return failRateLimited(limit.retryAfterSeconds)
+
     const parsed = await parseBody(request, createLeadSchema)
     if ("response" in parsed) return parsed.response
 
     const tenantId = process.env.DEMO_TENANT_ID?.trim() || "brightpath"
     const lead = await createLead(tenantId, parsed.data, "capture-form")
 
-    const analyze =
-      new URL(request.url).searchParams.get("analyze") !== "0"
-
+    const analyze = new URL(request.url).searchParams.get("analyze") !== "0"
     if (!analyze) return ok(lead, 201)
 
     try {
@@ -54,7 +61,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
+async function list(request: Request) {
   try {
     const auth = requireAuth(request)
     if (isResponse(auth)) return auth
@@ -77,5 +84,7 @@ export async function GET(request: Request) {
   }
 }
 
+export const POST = observe("POST /api/v1/leads", capture)
+export const GET = observe("GET /api/v1/leads", list)
+
 export const dynamic = "force-dynamic"
-void fail

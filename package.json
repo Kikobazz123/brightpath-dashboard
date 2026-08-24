@@ -1,12 +1,22 @@
 {
-  "name": "shadcn-dashboard-nextjs",
+  "name": "brightpath-sales-assistant",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+
+    "db:push": "drizzle-kit push",
+    "db:status": "tsx --env-file=.env.local scripts/db-status.ts",
+    "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
+
+    "verify:scoring": "tsx scripts/verify-scoring.ts",
+    "verify:provider": "tsx --env-file=.env.local scripts/verify-provider.ts",
+    "verify:journey": "tsx --env-file=.env.local scripts/verify-journey.ts",
+    "verify": "pnpm verify:scoring && pnpm verify:journey"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -1,8 +1,9 @@
 import { handleError, isResponse, ok, requireAuth } from "@/lib/api/http"
 import { runFollowUp } from "@/lib/leads/service"
+import { observe } from "@/lib/api/observability"
 
 /** Draft a personalised follow-up from confirmed facts only. Sets state to 'drafted' — never 'sent'. Sending requires a confirmed provider receipt. */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = requireAuth(request)
     if (isResponse(auth)) return auth
@@ -12,3 +13,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return handleError(error)
   }
 }
+
+export const POST = observe("POST /api/v1/leads/[id]/follow-up", handlePOST)
+
+export const dynamic = "force-dynamic"

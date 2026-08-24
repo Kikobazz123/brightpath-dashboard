@@ -30,11 +30,24 @@ export function fail(
   code: ApiErrorCode,
   message: string,
   fields?: Record<string, string[]>,
+  headers?: Record<string, string>,
 ) {
   return NextResponse.json(
     { ok: false as const, error: { code, message, ...(fields ? { fields } : {}) } },
-    { status: STATUS[code] },
+    { status: STATUS[code], ...(headers ? { headers } : {}) },
   )
+}
+
+/**
+ * Reject an over-limit caller, and tell it when to come back.
+ *
+ * `Retry-After` is the difference between a client that backs off and one that
+ * responds to the error by retrying harder.
+ */
+export function failRateLimited(retryAfterSeconds: number) {
+  return fail("rate_limited", "Too many requests. Try again shortly.", undefined, {
+    "retry-after": String(retryAfterSeconds),
+  })
 }
 
 export interface AuthContext {
@@ -57,15 +70,55 @@ export function authenticate(request: Request): AuthContext | null {
   const expected = process.env.DEMO_API_TOKEN?.trim()
   const tenantId = process.env.DEMO_TENANT_ID?.trim() || "brightpath"
 
-  // With no token configured, the API is single-tenant and open locally.
-  if (!expected) return { tenantId, actor: "local" }
+  /**
+   * With no token configured the API is single-tenant and open. That is fine
+   * on a laptop and dangerous anywhere else, so refuse it in production rather
+   * than letting a forgotten env var quietly publish every lead.
+   */
+  if (!expected) {
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[auth] DEMO_API_TOKEN is unset in production — refusing all API access.",
+      )
+      return null
+    }
+    return { tenantId, actor: "local" }
+  }
 
   const header = request.headers.get("authorization") ?? ""
   const presented = header.replace(/^Bearer\s+/i, "").trim()
-  if (!presented || presented !== expected) return null
+  if (!presented || !secureEquals(presented, expected)) return null
 
-  const actor = request.headers.get("x-actor")?.trim() || "rep"
+  const actor = sanitizeActor(request.headers.get("x-actor"))
   return { tenantId, actor }
+}
+
+/**
+ * Compare in time independent of how much of the string matched.
+ *
+ * `===` returns as soon as two bytes differ, so how long it took leaks how much
+ * of the token was right — enough, over many requests, to recover it one
+ * character at a time. The cost of not caring is a stolen token; the cost of
+ * caring is this function.
+ */
+function secureEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  }
+  return diff === 0
+}
+
+/**
+ * The actor is caller-supplied and lands in the audit trail, so it is bounded
+ * and stripped of control characters. An unbounded header would let a caller
+ * write forged-looking lines into the timeline a rep reads as fact.
+ */
+function sanitizeActor(raw: string | null): string {
+  const trimmed = raw?.trim()
+  if (!trimmed) return "rep"
+  return trimmed.replace(/[\p{Cc}\p{Cf}]/gu, "").slice(0, 64) || "rep"
 }
 
 export function requireAuth(request: Request): AuthContext | NextResponse {

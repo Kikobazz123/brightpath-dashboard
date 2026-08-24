@@ -7,6 +7,7 @@ import {
   requireAuth,
 } from "@/lib/api/http"
 import { confirmSend } from "@/lib/leads/service"
+import { observe } from "@/lib/api/observability"
 
 /**
  * Record that a follow-up was actually delivered.
@@ -15,7 +16,7 @@ import { confirmSend } from "@/lib/leads/service"
  * and that provider's message id. Without a receipt there is no claim — the
  * system will say 'drafted' forever rather than assert a send it cannot prove.
  */
-export async function POST(
+async function handlePOST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -41,3 +42,7 @@ export async function POST(
     return handleError(error)
   }
 }
+
+export const POST = observe("POST /api/v1/leads/[id]/confirm-send", handlePOST)
+
+export const dynamic = "force-dynamic"

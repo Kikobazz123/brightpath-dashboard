@@ -1,8 +1,9 @@
 import { handleError, isResponse, ok, requireAuth } from "@/lib/api/http"
 import { runScoring } from "@/lib/leads/service"
+import { observe } from "@/lib/api/observability"
 
 /** Apply the BrightPath rubric to stored evidence. Deterministic: no model is involved, and the same evidence always yields the same score. Analyses first if no evidence exists yet. */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = requireAuth(request)
     if (isResponse(auth)) return auth
@@ -12,3 +13,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return handleError(error)
   }
 }
+
+export const POST = observe("POST /api/v1/leads/[id]/score", handlePOST)
+
+export const dynamic = "force-dynamic"

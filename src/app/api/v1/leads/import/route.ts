@@ -7,6 +7,7 @@ import {
   requireAuth,
 } from "@/lib/api/http"
 import { createLead, runFullPipeline } from "@/lib/leads/service"
+import { observe } from "@/lib/api/observability"
 
 /**
  * Bulk import from a spreadsheet or CRM export.
@@ -16,7 +17,7 @@ import { createLead, runFullPipeline } from "@/lib/leads/service"
  * succeeded and what did not, because "some of it worked" is the truth and the
  * operator needs to know which half.
  */
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   try {
     const auth = requireAuth(request)
     if (isResponse(auth)) return auth
@@ -35,10 +36,17 @@ export async function POST(request: Request) {
           await runFullPipeline(auth.tenantId, lead.id)
         }
       } catch (error) {
-        failures.push({
-          index,
-          reason: error instanceof Error ? error.message : "unknown error",
-        })
+        /**
+         * Report the row, not the reason.
+         *
+         * A raw error message here can carry a constraint name, a column, or a
+         * connection string straight back to the caller — the same leak
+         * `handleError` exists to prevent, and it would be strange to guard it
+         * on every other route and then hand it over in a bulk response. The
+         * detail goes to the log, where an operator can reach it.
+         */
+        console.error(`[import] row ${index} failed`, error)
+        failures.push({ index, reason: "This row could not be imported." })
       }
     }
 
@@ -55,3 +63,7 @@ export async function POST(request: Request) {
     return handleError(error)
   }
 }
+
+export const POST = observe("POST /api/v1/leads/import", handlePOST)
+
+export const dynamic = "force-dynamic"

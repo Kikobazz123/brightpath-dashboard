@@ -120,6 +120,84 @@ async function postJson(
 }
 
 /* ------------------------------------------------------------------ *
+ * Schema dialects
+ * ------------------------------------------------------------------ *
+ *
+ * Pipeline stages declare one plain JSON Schema. Every provider then wants it
+ * in a slightly different dialect, and getting that wrong is unusually nasty
+ * here: a rejected schema is a 400, a 400 is non-retryable, and a non-retryable
+ * failure degrades to the stub. The symptom is someone pasting in a perfectly
+ * good API key, seeing every lead still come back NEEDS_REVIEW, and concluding
+ * the key is broken.
+ *
+ * So the translation lives in the adapters, where dialect knowledge belongs,
+ * rather than making every stage author its schema twice.
+ */
+
+const GEMINI_ALLOWED_KEYS = new Set([
+  "type",
+  "format",
+  "description",
+  "nullable",
+  "enum",
+  "items",
+  "properties",
+  "required",
+  "minimum",
+  "maximum",
+  "minItems",
+  "maxItems",
+])
+
+/**
+ * JSON Schema -> Gemini's `responseSchema`, which is an OpenAPI 3.0 subset.
+ *
+ * Three differences that actually bite:
+ *   - `additionalProperties` is not in the subset and is rejected outright
+ *   - a union type (`["string", "null"]`) has to become `nullable: true`
+ *   - the type name is a proto enum, so it must be upper-cased
+ */
+function toGeminiSchema(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(toGeminiSchema)
+  if (typeof node !== "object" || node === null) return node
+
+  const input = node as Record<string, unknown>
+  const output: Record<string, unknown> = {}
+
+  for (const [key, value] of Object.entries(input)) {
+    if (!GEMINI_ALLOWED_KEYS.has(key)) continue
+
+    if (key === "type") {
+      const types = Array.isArray(value) ? value : [value]
+      if (types.includes("null")) output.nullable = true
+      const concrete = types.find((t) => t !== "null")
+      if (typeof concrete === "string") output.type = concrete.toUpperCase()
+      continue
+    }
+
+    if (key === "properties" && typeof value === "object" && value !== null) {
+      const properties: Record<string, unknown> = {}
+      for (const [name, child] of Object.entries(
+        value as Record<string, unknown>,
+      )) {
+        properties[name] = toGeminiSchema(child)
+      }
+      output.properties = properties
+      continue
+    }
+
+    if (key === "items") {
+      output.items = toGeminiSchema(value)
+      continue
+    }
+
+    output[key] = value
+  }
+
+  return output
+}
+
+/* ------------------------------------------------------------------ *
  * Adapters
  * ------------------------------------------------------------------ */
 
@@ -139,7 +217,7 @@ async function callGemini(req: GenerateRequest): Promise<GenerateResult> {
         temperature: 0,
         maxOutputTokens: req.maxOutputTokens ?? 2048,
         responseMimeType: "application/json",
-        responseSchema: req.schema,
+        responseSchema: toGeminiSchema(req.schema),
       },
     },
     "gemini",
@@ -195,9 +273,18 @@ async function callOpenAiCompatible(
       model: config.model,
       temperature: 0,
       max_tokens: req.maxOutputTokens ?? 2048,
+      /**
+       * Strict mode is off deliberately. It additionally demands that every
+       * declared property appear in `required` and rejects numeric bounds, so
+       * the analyst schema — where `note` is optional and `confidence` is
+       * bounded 0-1 — would be refused with a 400, which degrades to the stub
+       * rather than failing loudly. The schema is a strong hint; the real gate
+       * is the Zod parse plus the verbatim-quote check, which no provider flag
+       * can substitute for.
+       */
       response_format: {
         type: "json_schema",
-        json_schema: { name: "result", strict: true, schema: req.schema },
+        json_schema: { name: "result", strict: false, schema: req.schema },
       },
       messages: [
         { role: "system", content: req.system },
@@ -328,15 +415,36 @@ export async function generateStructured(
     const fallback = fallbackProvider()
     const retryable = error instanceof ProviderError ? error.retryable : true
 
+    /**
+     * Log the real reason before degrading.
+     *
+     * Without this the failure is invisible: the caller gets usable stub
+     * output, the run is labelled honestly in the UI, and nothing anywhere
+     * says *why*. A misconfigured key and a rate limit then look identical
+     * from the outside, and the first is a five-second fix.
+     */
+    console.error(
+      `[ai] ${primary} failed (retryable=${retryable}):`,
+      error instanceof Error ? error.message : String(error),
+    )
+
     if (fallback && retryable) {
       try {
         return await dispatch(fallback, req)
-      } catch {
-        // fall through to stub
+      } catch (fallbackError) {
+        console.error(
+          `[ai] fallback ${fallback} also failed:`,
+          fallbackError instanceof Error
+            ? fallbackError.message
+            : String(fallbackError),
+        )
       }
     }
 
     if (primary !== "stub") {
+      console.warn(
+        `[ai] degrading to stub output — this lead will read as NEEDS_REVIEW`,
+      )
       const stubbed = await callStub(req)
       return { ...stubbed, model: `stub (after ${primary} failed)` }
     }

@@ -1,5 +1,6 @@
 import { handleError, isResponse, ok, requireAuth } from "@/lib/api/http"
 import { getActivity } from "@/lib/leads/service"
+import { observe } from "@/lib/api/observability"
 
 /**
  * The lead's timeline: every action, who took it, and when.
@@ -7,7 +8,7 @@ import { getActivity } from "@/lib/leads/service"
  * This is the audit trail and the evidence behind the SLA numbers. Append-only,
  * so it can be trusted as a record rather than a summary.
  */
-export async function GET(
+async function handleGET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -20,3 +21,7 @@ export async function GET(
     return handleError(error)
   }
 }
+
+export const GET = observe("GET /api/v1/leads/[id]/activity", handleGET)
+
+export const dynamic = "force-dynamic"

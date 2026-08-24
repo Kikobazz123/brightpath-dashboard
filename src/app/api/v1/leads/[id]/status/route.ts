@@ -7,6 +7,7 @@ import {
   requireAuth,
 } from "@/lib/api/http"
 import { updateStatus } from "@/lib/leads/service"
+import { observe } from "@/lib/api/observability"
 
 /**
  * Move a lead's status.
@@ -14,7 +15,7 @@ import { updateStatus } from "@/lib/leads/service"
  * Human-only. No AI stage writes here — the system prepares and recommends, a
  * person decides. This is also a first-touch action, so it stops the SLA clock.
  */
-export async function PATCH(
+async function handlePATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -39,3 +40,7 @@ export async function PATCH(
     return handleError(error)
   }
 }
+
+export const PATCH = observe("PATCH /api/v1/leads/[id]/status", handlePATCH)
+
+export const dynamic = "force-dynamic"
