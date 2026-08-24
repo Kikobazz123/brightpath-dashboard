@@ -161,8 +161,32 @@ export async function analyzeLead(normalizedContext: string): Promise<AnalyzeRes
 
   const cleaned = dropUnverifiableClaims(result.json, normalizedContext)
 
+  /**
+   * Carry a degradation reason into the evidence itself.
+   *
+   * When the provider fails, the pipeline keeps going and produces an honest
+   * empty extraction — but "nothing was found in this lead" and "the extractor
+   * never ran" look identical on the record, and only one of them is about the
+   * lead. The note travels with the evidence so whoever opens it can tell the
+   * difference without access to a server log.
+   */
+  const withReason =
+    result.degradedReason && typeof cleaned === "object" && cleaned !== null
+      ? {
+          ...(cleaned as Record<string, unknown>),
+          context_notes: [
+            ...(Array.isArray(
+              (cleaned as { context_notes?: unknown }).context_notes,
+            )
+              ? (cleaned as { context_notes: string[] }).context_notes
+              : []),
+            `Extraction degraded — ${result.degradedReason}`,
+          ],
+        }
+      : cleaned
+
   const parsed = evidenceSchema.safeParse({
-    ...(cleaned as object),
+    ...(withReason as object),
     extracted_at: new Date().toISOString(),
     model: `${result.provider}:${result.model}`,
   })

@@ -35,6 +35,15 @@ export interface GenerateResult {
   inputTokens: number | null
   outputTokens: number | null
   durationMs: number
+  /**
+   * Why this result came from the stub rather than the configured provider.
+   *
+   * Set only on a degraded call. Stages surface it alongside their output so
+   * the reason reaches whoever is looking at the lead — an operator seeing
+   * "not analysed" is owed the cause, and on a serverless host the log line
+   * carrying it may be somewhere they cannot reach.
+   */
+  degradedReason?: string
 }
 
 export class ProviderError extends Error {
@@ -207,6 +216,22 @@ async function callGemini(req: GenerateRequest): Promise<GenerateResult> {
   const model = env("GEMINI_MODEL", "gemini-2.5-flash")
   const started = Date.now()
 
+  /**
+   * Turn thinking off on the 2.5 flash models.
+   *
+   * They think by default, and thinking tokens come out of `maxOutputTokens` —
+   * so the model can spend the entire budget reasoning, return an empty text
+   * part with finishReason MAX_TOKENS, and produce a 200 that contains no
+   * answer. Extraction is a transcription job with a fixed schema; there is
+   * nothing here worth thinking about, and paying for it in the same budget as
+   * the response is how this call silently returns nothing.
+   *
+   * Only flash accepts a zero budget — 2.5 Pro enforces a floor — so Pro keeps
+   * its default and is given headroom instead.
+   */
+  const thinks = /2\.5/.test(model)
+  const canDisableThinking = thinks && /flash/i.test(model)
+
   const data = await postJson(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     { "x-goog-api-key": key },
@@ -215,19 +240,52 @@ async function callGemini(req: GenerateRequest): Promise<GenerateResult> {
       contents: [{ role: "user", parts: [{ text: req.user }] }],
       generationConfig: {
         temperature: 0,
-        maxOutputTokens: req.maxOutputTokens ?? 2048,
+        // Headroom, because a truncated response is indistinguishable from a
+        // refusal by the time it reaches the parser.
+        maxOutputTokens: req.maxOutputTokens ?? 4096,
         responseMimeType: "application/json",
         responseSchema: toGeminiSchema(req.schema),
+        ...(canDisableThinking
+          ? { thinkingConfig: { thinkingBudget: 0 } }
+          : {}),
       },
     },
     "gemini",
   )
 
   const candidates = data.candidates as
-    | Array<{ content?: { parts?: Array<{ text?: string }> } }>
+    | Array<{
+        content?: { parts?: Array<{ text?: string }> }
+        finishReason?: string
+      }>
     | undefined
-  const text = candidates?.[0]?.content?.parts?.[0]?.text ?? ""
+  const candidate = candidates?.[0]
+  const text = candidate?.content?.parts?.[0]?.text ?? ""
   const usage = data.usageMetadata as Record<string, number> | undefined
+
+  /**
+   * An empty body on a 200 is its own failure and needs its own message.
+   *
+   * Left to fall through, `extractJson("")` throws "no parseable JSON", which
+   * names the symptom and hides the cause — and the cause is usually one of
+   * three specific things worth telling apart: the budget went on thinking,
+   * a safety filter blocked the answer, or the response was cut off.
+   */
+  if (!text.trim()) {
+    const reason = candidate?.finishReason ?? "no candidates returned"
+    const thinkingTokens = usage?.thoughtsTokenCount
+    const detail =
+      thinkingTokens && thinkingTokens > 0
+        ? ` ${thinkingTokens} tokens went to thinking.`
+        : ""
+
+    throw new ProviderError(
+      `gemini returned an empty response (finishReason=${reason}).${detail}` +
+        ` Model "${model}" may not exist for this key, or the output budget was exhausted.`,
+      "gemini",
+      reason === "MAX_TOKENS",
+    )
+  }
 
   return {
     json: extractJson(text),
@@ -446,7 +504,14 @@ export async function generateStructured(
         `[ai] degrading to stub output — this lead will read as NEEDS_REVIEW`,
       )
       const stubbed = await callStub(req)
-      return { ...stubbed, model: `stub (after ${primary} failed)` }
+      return {
+        ...stubbed,
+        model: `stub (after ${primary} failed)`,
+        degradedReason:
+          error instanceof Error
+            ? `${primary}: ${error.message}`
+            : `${primary}: ${String(error)}`,
+      }
     }
 
     throw error
