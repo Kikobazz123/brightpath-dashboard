@@ -1,218 +1,168 @@
-# BrightPath — session handoff
+# BrightPath — status
 
-Both build sessions were interrupted by an API 529 on 2026-08-24. Nothing was
-lost: every change was uncommitted at the time and has since been committed and
-pushed. This file records exactly where each session stopped.
+**Both builds are complete.** The frontend and backend gaps this file used to
+track are closed. What remains is one manual step that cannot be automated:
+connecting GitHub to Vercel and entering secrets. See `DEPLOYMENT.md`.
 
-## Repository layout
-
-Two sessions ran against two working trees:
-
-| Session | Local path | Repo | Last write |
-|---|---|---|---|
-| 1 — backend | `AIOS/projects/admin-dashboard` | `brightpath-backend` | 00:28 |
-| 2 — frontend | `AIOS/projects/admin-dashboard-ui` | `brightpath-dashboard` | 01:48 |
-
-Session 2's tree was branched from session 1's around 00:48, so it contains the
-whole backend **byte-identical** plus the UI work. `brightpath-dashboard` is the
-superset and is where work should continue. `brightpath-backend` is kept only as
-the untouched record of session 1.
-
-Both repos start from the same pristine upstream commit
-(`shadcnstore/shadcn-dashboard-landing-template`, nextjs-version, MIT), but were
-initialised separately, so their histories are unrelated.
-
-## Session 1 — backend (complete, unverified)
-
-~4,200 lines across 33 files. Timeline: API routes 23:53 → rubric/scoring/
-advisor 00:02–00:05 → verify-scoring 00:07 → seed 00:09 → verify-journey 00:25 →
-db-status 00:28, then the session died.
-
-Built:
-
-- **Persistence** — Drizzle schema for leads, activity and follow-up state
-  (`src/lib/db/schema.ts`), Neon serverless connection (`src/lib/db/index.ts`),
-  `drizzle.config.ts`.
-- **Contracts** — Zod schemas shared by routes and service
-  (`src/lib/contracts/leads.ts`), so an HTTP caller and a Server Component
-  validate against one definition.
-- **Transport** — response envelope, error mapping, bearer auth
-  (`src/lib/api/http.ts`).
-- **Pipeline** — `intake → analyst → scoring/rubric → writer → advisor`. Scoring
-  uses an explicit BrightPath rubric (company size/fit, industry fit, budget,
-  need, intent) rather than letting the model decide what "good" means; missing
-  evidence lowers confidence or triggers `NEEDS_REVIEW` instead of being guessed.
-- **AI provider** — provider-agnostic (`src/lib/ai/provider.ts`) with gemini /
-  groq / openrouter / anthropic adapters and a **stub mode that is the current
-  default**, so the whole journey runs end-to-end with no API key.
-- **API v1** — 12 routes under `src/app/api/v1/`: leads list/create/import, lead
-  detail, analyze, score, follow-up, confirm-send, next-action, status,
-  activity, stats, and per-source webhooks.
-- **Scripts** — `seed`, `db-status`, `verify-scoring`, `verify-journey`.
-
-### Where it stopped
-
-It finished writing its verification tooling and never ran it. The last file
-written was `scripts/db-status.ts`, a diagnostic — consistent with being about to
-check the database when the 529 hit.
-
-**Open items:**
-
-1. No end-to-end run against a live database has happened. `DATABASE_URL` points
-   at a Neon project in `.env.local`, but the schema was never confirmed pushed
-   and `verify-journey.ts` was never executed.
-2. The scripts have no npm entries. `tsx` and `drizzle-kit` are installed but
-   `package.json` still has only `dev`/`build`/`start`/`lint`. Run them as
-   `pnpm tsx scripts/seed.ts` until scripts are added.
-3. Checklist items from `BACKEND_BUILD_CHECKLIST.md` not yet evidenced in code:
-   access control beyond the shared demo token, and observability.
-
-## Session 2 — frontend (stopped mid-task)
-
-44 files, +1571/−982. Timeline: route templates 00:59 → count-up 01:00 →
-dashboard cards 01:05–01:13 → tasks 01:17 → landing rebuild 01:21–01:44 →
-upgrade button 01:47 → `server-data.ts` 01:48, then the session died.
-
-Built:
-
-- **Landing** rebranded to BrightPath Solutions — hero, stats, logo carousel,
-  about, features, pricing, FAQ, CTA, navbar, footer, contact. Blog, team and
-  testimonials sections deleted as off-scope for the sales-assistant demo.
-- **Brand tokens** in `src/app/globals.css`; site metadata in `src/config/site.ts`.
-- **Auth pages** — sign-in, sign-up and forgot-password, all three variants.
-- **Dashboard chrome** — section cards, metrics overview, user stat cards,
-  sidebar, site header/footer, logo, upgrade button.
-- **Motion** — route `template.tsx` for `(dashboard)` and `landing`, plus
-  `src/components/motion/count-up.tsx`.
-- **`src/lib/client/server-data.ts`** — cached read accessors (`fetchStats`,
-  `fetchLeads`, `fetchLead`, `fetchActivity`) that call the service layer
-  directly rather than round-tripping through the app's own HTTP API.
-
-### Where it stopped
-
-Mid-task, on the data layer. `server-data.ts` was the very last file written and
-the UI is not yet connected to anything real.
-
-**Open items, in the order the session was heading:**
-
-1. **`src/lib/client/actions.ts` does not exist.** `server-data.ts` says
-   "Mutations live in `./actions`" — that file was next and was never written.
-   It needs Server Actions for analyze, score, follow-up, confirm-send,
-   next-action and status.
-2. **Nothing imports `server-data.ts`.** It has zero consumers; no page is wired
-   to real data.
-3. **There is no leads UI at all.** `src/app/(dashboard)/` still holds the
-   template's screens (calendar, chat, mail, tasks, users…). The judge journey
-   in `BACKEND_SCOPE.md` — capture → qualify → score → message → next action →
-   status — has no interface.
-4. Dashboard cards are restyled but still render template numbers, not
-   `fetchStats()`.
-
-## Suggested next step
-
-Resume in `brightpath-dashboard`. The backend is ahead of the frontend, so the
-highest-value move is to close the gap the checklist calls "reconcile gaps after
-both builds exist": write `actions.ts`, add a leads list and lead detail page
-that consume `server-data.ts`, then run `verify-journey.ts` against a seeded
-database to confirm the demo path end to end.
-
-## Local safety copy
-
-A source-only archive of both trees, taken before any of this was committed, is
-at `AIOS backup/brightpath-source-20260824-021844.tgz` (19 MB, excludes
-`node_modules`/`.next`, includes both `.git` directories and the real
-`.env.local` files).
-
-## Secrets
-
-`.gitignore` keeps `.env*` out of git, with an explicit `!.env.example`
-exception so the documented config template is tracked. Real values in
-`.env.local` — the Neon `DATABASE_URL` and the demo token — were never committed
-and are not on GitHub. `.env.example` contains placeholders only.
+The history of how the project got here is kept at the bottom, because the two
+interruptions explain some of the shape of the repo.
 
 ---
 
-# Addendum — full-project audit (2026-08-24, after the second interruption)
+## Where things stand
 
-A disk-wide sweep was run to confirm nothing about this project lives outside
-the two repos.
+| | State |
+|---|---|
+| Backend | Complete. 12 API routes + health. 38 verification checks green. |
+| Frontend | Complete. Capture, triage, lead detail, dashboard — all on real data. |
+| Database | Neon `brightpath` (`weathered-haze-95690617`), schema pushed, 9 seeded leads. |
+| GitHub | `Kikobazz123/brightpath-dashboard`, branch `master`, private, up to date. |
+| Vercel | **Not deployed.** Blocked on the GitHub connection. |
+| AI provider | **Stub.** Runs, extracts nothing. Needs a key — see below. |
 
-## What the sweep found
+### The two things still outstanding
 
-**No stray code.** The only BrightPath-named things outside the repos are this
-project's memory files, the safety archive, a Windows recent-items shortcut, and
-the brief in Downloads. All application code was already committed and pushed.
+Both need a human, and neither is a code change.
 
-**The brief was not in version control.** `CLAUDE.md`, `BACKEND_SCOPE.md` and
-`BACKEND_BUILD_CHECKLIST.md` lived only in
-`C:\Users\USER\Downloads\Lordgen main files\Brightpath solution\`. They are the
-source of truth for the build and were one deleted folder away from being lost.
-They are now committed: `CLAUDE.md` at the repo root (so Claude Code loads it
-automatically) and the other two under `brief/`.
+1. **Connect GitHub to Vercel, then import the repo.** The Vercel account has
+   no Git integration at all, so it cannot see a private repo. Full steps and
+   the environment-variable table are in `DEPLOYMENT.md`.
 
-**The case-study PDF is not on this machine.** `CLAUDE.md` calls "the BrightPath
-case study/PDF" the source of truth, but no such PDF exists anywhere in the user
-profile. It is presumably still in email or the competition portal. Worth saving
-into `brief/` so the repo is genuinely self-contained.
+2. **Add a Gemini API key.** Free, no card, from
+   <https://aistudio.google.com/apikey>. Set `AI_PROVIDER=gemini` and
+   `GEMINI_API_KEY` in `.env.local` and in Vercel, then run
+   `pnpm verify:provider` to confirm it actually works.
 
-## Project context recovered from session memory
+   Without it the app runs and the seeded leads look correct, but a **newly
+   captured lead comes back `NEEDS_REVIEW` with no drafted message**. That is
+   the honest behaviour — the stub claims nothing rather than inventing
+   evidence — but it makes a live capture demo fall flat.
 
-This is **AI BuildFest 2026, Track 1, Case Study 2** — a competition build.
+---
 
-The original intent was that **both sessions share the single `admin-dashboard`
-repo**, split by path: backend owned `src/lib/**`, `src/app/api/v1/**`,
-`scripts/**`, `drizzle*`; frontend owned the landing page and
-`src/app/(dashboard)/**`. In practice the frontend session copied the tree to
-`admin-dashboard-ui` at 00:48 instead of working in place. Nothing was lost —
-the backend files are byte-identical across both — but it means
-`brightpath-dashboard` is the one repo the original plan called for, and
-`brightpath-backend` is a frozen snapshot rather than a parallel line of work.
+## The repository
 
-Neon project `brightpath` = `weathered-haze-95690617`.
+Two repos exist. Only one is live work.
 
-### The design decision the build rests on
+| Repo | Local path | Role |
+|---|---|---|
+| `brightpath-dashboard` | `AIOS/projects/admin-dashboard-ui` | **The project.** Backend + frontend. |
+| `brightpath-backend` | `AIOS/projects/admin-dashboard` | Frozen snapshot of the first session. Do not develop here. |
 
-The model extracts *evidence* (each fact carrying the verbatim quote it came
-from); deterministic code in `src/lib/pipeline/scoring.ts` computes the score
-against `rubric.ts`. The brief demands explicit criteria and explainable scores,
-and a model-emitted number is neither — it drifts between runs and cannot be
-audited. It also makes the build nearly free to run.
+`brightpath-dashboard` was branched from the other tree partway through, so it
+contains the whole backend byte-identical plus everything since. The two
+histories are unrelated — each was initialised separately from the same
+pristine upstream (`shadcnstore/shadcn-dashboard-landing-template`,
+nextjs-version, MIT).
 
-**Never move scoring into a prompt.** Policy changes belong in `rubric.ts` with a
-version bump. Two gates exist there because a plain weighted sum got them wrong:
-an explicit "no budget" disqualifies outright, and HIGH priority requires a
-*stated* problem.
+---
 
-## Verification status
+## Running it
 
-`npx tsx scripts/verify-scoring.ts` — **18 passed, 0 failed** (run 2026-08-24).
-No database or network required. It confirms determinism across 200 runs,
-order-independence, rubric traceability, NEEDS_REVIEW on missing evidence, both
-gates, and that fabricated evidence is rejected by the contract.
+```bash
+pnpm install
+pnpm dev                 # http://localhost:3000
 
-`npx tsx --env-file=.env.local scripts/verify-journey.ts` — **never run.** 20
-checks against a real database, self-cleaning. This is still the outstanding
-verification and the first thing to do on resuming.
+pnpm verify:scoring      # 18 checks — no database, no network, no key
+pnpm verify:journey      # 20 checks against a real database, self-cleaning
+pnpm verify:provider     # one real AI call; fails loudly if it hit the stub
 
-## Spec compliance check
+pnpm db:status           # row counts by tenant
+pnpm db:seed             # demo leads
+pnpm db:push             # apply schema changes
+```
 
-All ten API endpoints required by `CLAUDE.md` exist with the specified verbs,
-plus the optional `POST /webhooks/leads/{source}` and an extra `/stats` and
-`/leads/{id}/confirm-send`. All three specified tables exist in the schema:
-`leads`, `activities`, `analysisRuns`.
+`.env.local` holds the real values and is gitignored. `.env.example` documents
+every variable with placeholders and is tracked.
 
-Gaps against the brief, unchanged from above: no end-to-end run against a live
-database; access control is still a single shared demo token; observability is
-not evidenced; and the whole frontend half of "every frontend action maps to an
-API" is outstanding.
+---
 
-## Operational note — the scripts have no npm entries
+## What the build actually is
 
-`tsx` and `drizzle-kit` are installed but `package.json` still lists only
-`dev`/`build`/`start`/`lint`. Until entries are added, invoke the tooling
-directly:
+A sales assistant for BrightPath Solutions — AI BuildFest 2026, Track 1, Case
+Study 2. A lead arrives, is captured, analysed, scored against an explicit
+rubric, given a drafted follow-up and one recommended next action, and tracked
+through a status a human owns.
 
-    npx tsx scripts/verify-scoring.ts
-    npx tsx --env-file=.env.local scripts/db-status.ts
-    npx tsx --env-file=.env.local scripts/seed.ts
-    npx tsx --env-file=.env.local scripts/verify-journey.ts
+### The design decision everything rests on
+
+**The model extracts evidence. Deterministic code computes the score.**
+
+The analyst reports facts, each carrying the verbatim quote it came from. The
+rubric in `src/lib/pipeline/rubric.ts` applies policy to those facts. The model
+has never been told what a good lead looks like, because telling it would
+invite it to flatter whichever lead it happens to be reading.
+
+This is why the same evidence scores identically across 200 runs, why every
+point traces to a named rubric line, and why the build is nearly free to run.
+
+**Never move scoring into a prompt.** Policy changes belong in `rubric.ts` with
+a version bump. Two gates live there because a plain weighted sum got them
+wrong: an explicit "no budget" disqualifies outright, and HIGH priority
+requires a *stated* problem.
+
+### The other rule: no claim without proof
+
+- A signal with no verbatim quote is reported absent, not guessed. Claims whose
+  quote cannot be found in the source text are dropped.
+- A score is withheld — `null`, rendered as an em dash — when required evidence
+  is missing. Never zero, which is a judgement rather than the absence of one.
+- `median_first_touch_minutes` is `null` until something is touched. "No data"
+  and "instant response" must not share a glyph.
+- **There is no send button.** The only route to `sent` is recording a provider
+  message id. A button that flipped a column would be the most damaging lie
+  this app could tell, given the whole product exists because leads go cold
+  unnoticed.
+
+---
+
+## Verification
+
+| Suite | Checks | Needs |
+|---|---|---|
+| `verify:scoring` | 18 | nothing |
+| `verify:journey` | 20 | a database |
+| `verify:provider` | live call | an API key |
+
+`verify:journey` covers capture, the pipeline, truthfulness of follow-up state,
+the SLA clock, the audit trail, and four cross-tenant access checks. It creates
+a throwaway tenant and deletes it, so it is safe against the demo database.
+
+Spec compliance: all ten API endpoints required by `CLAUDE.md` exist with the
+specified verbs, plus `POST /webhooks/leads/{source}`, `/stats`,
+`/leads/{id}/confirm-send` and `/health`. All three specified tables exist.
+
+Remaining gaps are listed plainly at the end of
+`brief/BACKEND_BUILD_CHECKLIST.md`.
+
+---
+
+## History
+
+Two sessions were interrupted by API 529s on 2026-08-24. Nothing was lost.
+
+- **Session 1** built the backend — persistence, contracts, the pipeline, 12
+  API routes, the verification scripts. It finished writing its verification
+  tooling and died before running any of it.
+- **Session 2** rebranded the landing page, built the auth and dashboard
+  chrome, and stopped mid-task on `src/lib/client/server-data.ts` — the read
+  accessors existed but had no consumers, and there was no leads UI at all.
+- **Session 3** wrote `actions.ts`, built the whole leads workspace, replaced
+  the template's fabricated dashboard figures with real data, ran the
+  verification for the first time, and closed the access-control and
+  observability gaps.
+
+The original plan had both sessions sharing one repo split by path. Session 2
+copied the tree instead, which is why `brightpath-backend` exists as a frozen
+snapshot rather than a parallel line of work.
+
+The governing brief (`CLAUDE.md`, `brief/BACKEND_SCOPE.md`,
+`brief/BACKEND_BUILD_CHECKLIST.md`) lived only in a Downloads folder until it
+was committed — it was one deleted directory away from being lost. The
+case-study PDF that `CLAUDE.md` calls authoritative is still not on this
+machine; it is presumably in email or the competition portal, and belongs in
+`brief/`.
+
+A source-only archive taken before any of this was committed is at
+`AIOS backup/brightpath-source-20260824-021844.tgz` (19 MB, both `.git`
+directories, real `.env.local` files, no `node_modules`).
