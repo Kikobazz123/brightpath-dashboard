@@ -57,8 +57,9 @@ real values have never been committed.
 | `AI_PROVIDER` | `gemini` | Yes, to analyse leads |
 | `GEMINI_API_KEY` | From <https://aistudio.google.com/apikey> | Yes, with the above |
 | `GEMINI_MODEL` | `gemini-3.6-flash` | No — this is the default |
-| `AI_FALLBACK_PROVIDER` | `groq` | Strongly recommended — see below |
+| `AI_FALLBACK_PROVIDER` | `groq,openrouter` | Strongly recommended — see below |
 | `GROQ_API_KEY` | From <https://console.groq.com/keys> | With the above |
+| `OPENROUTER_API_KEY` | From <https://openrouter.ai/keys> | With the above |
 | `SLA_FIRST_TOUCH_MINUTES` | `15` | No — this is the default |
 | `DEMO_ACTOR` | `rep` | No — this is the default |
 | `CAPTURE_RATE_LIMIT` | `20` | No — this is the default |
@@ -74,22 +75,47 @@ Two of these are load-bearing in ways worth knowing:
   drafted message. The pre-seeded demo leads keep their scores. `/api/v1/health`
   reports this as `degraded` rather than pretending to be fine.
 
-### Why the fallback is worth five minutes
+### The failover chain, and why depth matters here
 
 `AI_PROVIDER` on its own is a single point of failure. Gemini's free tier has a
-daily cap, and when it is reached every lead captured until it resets comes back
+daily cap, and once it is reached every lead captured until it resets comes back
 `NEEDS_REVIEW` with no drafted message. Nothing errors and nothing is lost — the
-system degrades honestly — but the assistant stops assisting, and it will happen
-at the busiest moment rather than a convenient one.
+system degrades honestly — but the assistant stops assisting, and that will
+happen at the busiest moment rather than a convenient one.
 
-Setting `AI_FALLBACK_PROVIDER="groq"` with a Groq key means a rate limit, a
-quota, or an outage on Gemini rolls over to Groq automatically, per request. Use
-a different provider rather than a second Gemini key: two keys on one account
-share the quota you are trying to survive.
+`AI_FALLBACK_PROVIDER` takes a comma-separated chain, tried in order:
 
-Then run `pnpm verify:provider`. It calls the fallback directly, with no safety
-net, so a bad key or a retired model name fails in that check rather than on the
-day the primary goes down.
+```
+AI_FALLBACK_PROVIDER="groq,openrouter"
+```
+
+giving `gemini → groq → openrouter → stub`. Each request walks the chain
+independently, so a provider running dry costs nothing visible.
+
+**Why more than one.** A single fallback survives one provider running out. It
+does not survive the case this build actually faces — several people running the
+same demo against the same free tiers within an hour, where the burst that
+exhausts the primary is quite capable of exhausting the first fallback too. Three
+providers on three separate free accounts is the difference between a demo that
+degrades under repeated use and one that does not.
+
+**Use different providers, not extra keys.** Two keys on one account share the
+quota you are trying to survive. The primary, `stub`, unknown names and
+duplicates are all dropped from the chain, each with a warning.
+
+**The chain advances on any provider failure, not only rate limits.** This is
+deliberate and was learned the hard way: `gemini-2.5-flash` being retired
+returned a non-retryable 404, and an earlier version only failed over on
+retryable errors — so a dead model name would have taken the assistant down
+while a perfectly healthy second provider sat unused.
+
+Then verify, because an untested fallback is worse than none — it reads as
+protection right up until the primary dies:
+
+```bash
+pnpm verify:failover    # chain routing — no keys, no network
+pnpm verify:provider    # calls every configured link for real
+```
 
 ## 4. Deploy
 
@@ -145,8 +171,10 @@ the stub.
 ## Verifying the whole system
 
 ```bash
-pnpm verify:scoring    # 18 checks, no database, no network, no key
-pnpm verify:journey    # 20 checks against a real database, self-cleaning
+pnpm verify              # scoring + failover + journey
+pnpm verify:scoring      # 18 checks — no database, no network, no key
+pnpm verify:failover     # 12 checks — chain routing, no keys needed
+pnpm verify:journey      # 20 checks against a real database, self-cleaning
 ```
 
 `verify:journey` creates its own throwaway tenant and deletes it afterwards, so

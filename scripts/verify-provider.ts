@@ -20,7 +20,7 @@ import { writeFollowUp } from "../src/lib/pipeline/writer"
 import { scoreLead } from "../src/lib/pipeline/scoring"
 import {
   activeProvider,
-  configuredFallback,
+  configuredFallbacks,
   probeProvider,
 } from "../src/lib/ai/provider"
 
@@ -123,52 +123,78 @@ async function main() {
 }
 
 /**
- * Prove the failover target actually answers.
+ * Prove every link in the failover chain actually answers.
  *
  * An untested fallback is worse than none: it reads as protection right up
  * until the primary dies, which is the one moment nobody wants to discover
- * that its model name was retired too. This calls it directly — no safety net
+ * that its model name was retired too. Each is called directly — no safety net
  * — so a bad key fails here instead of degrading quietly in production.
+ *
+ * Every link is tried even after one fails, because "the second is broken but
+ * the third works" and "everything after the primary is broken" are very
+ * different situations and one run should tell you which you are in.
  */
 async function checkFallback() {
-  const fallback = configuredFallback()
+  const chain = configuredFallbacks()
 
-  console.log("\nFailover")
-  if (!fallback) {
+  console.log("\nFailover chain")
+
+  if (chain.length === 0) {
     console.log("  NONE  AI_FALLBACK_PROVIDER is not set.")
     console.log("        A rate limit or outage on the primary sends every new")
     console.log("        lead to NEEDS_REVIEW with no draft until it clears.")
-    console.log("        Set a second provider on a different account:")
-    console.log('          AI_FALLBACK_PROVIDER="groq"')
-    console.log('          GROQ_API_KEY="..."   # https://console.groq.com/keys')
+    console.log("        Set one or more providers on different accounts:")
+    console.log('          AI_FALLBACK_PROVIDER="groq,openrouter"')
+    console.log('          GROQ_API_KEY="..."        # console.groq.com/keys')
+    console.log('          OPENROUTER_API_KEY="..."  # openrouter.ai/keys')
     return
   }
 
-  try {
-    const result = await probeProvider(fallback, {
-      system: ANALYST_SYSTEM_PROMPT,
-      user: `Lead information:\n\n"""\n${SAMPLE}\n"""`,
-      schema: {
-        type: "object",
-        required: ["items", "context_notes"],
-        properties: {
-          items: { type: "array", items: { type: "object" } },
-          context_notes: { type: "array", items: { type: "string" } },
+  console.log(`  ${activeProvider()} (primary) → ${chain.join(" → ")} → stub`)
+  console.log("")
+
+  let healthy = 0
+
+  for (const provider of chain) {
+    try {
+      const result = await probeProvider(provider, {
+        system: ANALYST_SYSTEM_PROMPT,
+        user: `Lead information:\n\n"""\n${SAMPLE}\n"""`,
+        schema: {
+          type: "object",
+          required: ["items", "context_notes"],
+          properties: {
+            items: { type: "array", items: { type: "object" } },
+            context_notes: { type: "array", items: { type: "string" } },
+          },
         },
-      },
-      maxOutputTokens: 2048,
-    })
+        maxOutputTokens: 2048,
+      })
+      healthy++
+      console.log(
+        `  PASS  ${provider} — ${result.model} answered in ${result.durationMs}ms`,
+      )
+    } catch (error) {
+      const detail =
+        error instanceof Error ? error.message.split("\n")[0] : String(error)
+      console.log(`  FAIL  ${provider} — ${detail.slice(0, 150)}`)
+      process.exitCode = 1
+    }
+  }
+
+  console.log("")
+  if (healthy === chain.length) {
     console.log(
-      `  PASS  ${result.provider}:${result.model} answered in ${result.durationMs}ms`,
+      `        ${healthy} working fallback(s). The primary can fail ` +
+        `${healthy} time(s) over before any lead goes unanalysed.`,
     )
-    console.log("        The primary can fail without leads going unanalysed.")
-  } catch (error) {
-    const detail =
-      error instanceof Error ? error.message.split("\n")[0] : String(error)
-    console.log(`  FAIL  ${fallback} did not answer.`)
-    console.log(`        ${detail.slice(0, 160)}`)
-    console.log("        The failover would not catch anything today.")
-    process.exitCode = 1
+  } else if (healthy > 0) {
+    console.log(
+      `        ${healthy} of ${chain.length} fallbacks work. Fix the rest, or ` +
+        `remove them so the chain reflects reality.`,
+    )
+  } else {
+    console.log("        No fallback answers. The chain protects nothing.")
   }
 }
 

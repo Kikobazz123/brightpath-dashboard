@@ -91,38 +91,58 @@ export function activeProvider(): ProviderName {
 }
 
 /**
- * The provider to try when the primary fails a retryable way.
+ * The ordered list of providers to try after the primary.
  *
- * Validated rather than cast. The old version trusted the string, so
- * AI_FALLBACK_PROVIDER="grok" — one letter out — fell through `dispatch` to
- * the stub branch and looked exactly like having no failover at all. A typo in
- * a disaster-recovery setting should be loud, because the day it matters is
- * the day nobody is reading logs.
+ * `AI_FALLBACK_PROVIDER` takes a comma-separated chain — "groq,openrouter" —
+ * and a single value still works, so existing config is unaffected.
  *
- * "stub" is rejected as a fallback: it is already the floor, and naming it
- * here would imply a level of protection that is not there.
+ * Depth earns its place under exactly the condition this build faces: a judged
+ * demo where several people hammer the same free tier in the same hour. One
+ * fallback survives one provider running out. Two survives the case where the
+ * first fallback is also a free tier being hit by the same burst.
+ *
+ * Validated rather than cast, because AI_FALLBACK_PROVIDER="grok" — one letter
+ * out — used to fall through `dispatch` to the stub branch and look exactly
+ * like having no failover at all. A typo in a disaster-recovery setting should
+ * be loud: the day it matters is the day nobody is reading logs.
+ *
+ * "stub" is dropped from the chain, and so is the primary. Both would imply a
+ * level of protection that is not there — the primary because a second key on
+ * one account shares the quota you are trying to survive.
  */
-function fallbackProvider(): ProviderName | null {
+function fallbackProviders(): ProviderName[] {
   const raw = env("AI_FALLBACK_PROVIDER")
-  if (!raw) return null
+  if (!raw) return []
 
-  const parsed = parseProvider(raw)
-  if (!parsed) {
-    console.warn(
-      `[ai] AI_FALLBACK_PROVIDER="${raw}" is not a known provider; ` +
-        `no failover is configured. Known: ${KNOWN_PROVIDERS.join(", ")}.`,
-    )
-    return null
+  const primary = activeProvider()
+  const chain: ProviderName[] = []
+
+  for (const piece of raw.split(",")) {
+    const label = piece.trim()
+    if (!label) continue
+
+    const parsed = parseProvider(label)
+    if (!parsed) {
+      console.warn(
+        `[ai] AI_FALLBACK_PROVIDER lists "${label}", which is not a known ` +
+          `provider; skipping it. Known: ${KNOWN_PROVIDERS.join(", ")}.`,
+      )
+      continue
+    }
+    if (parsed === "stub") continue
+    if (parsed === primary) {
+      console.warn(
+        `[ai] AI_FALLBACK_PROVIDER lists the primary ("${parsed}"); skipping ` +
+          `it, since one account's keys share the quota being failed over.`,
+      )
+      continue
+    }
+    if (chain.includes(parsed)) continue
+
+    chain.push(parsed)
   }
-  if (parsed === "stub") return null
-  if (parsed === activeProvider()) {
-    console.warn(
-      `[ai] AI_FALLBACK_PROVIDER matches AI_PROVIDER ("${parsed}"); ` +
-        `a second key on the same provider shares the same quota.`,
-    )
-    return null
-  }
-  return parsed
+
+  return chain
 }
 
 /**
@@ -560,17 +580,9 @@ async function dispatch(
   }
 }
 
-/**
- * Generate structured JSON, falling back to a second provider on a retryable
- * failure and to the stub if everything is unavailable.
- *
- * Falling back to the stub rather than throwing is a deliberate choice: a rate
- * limit should degrade the lead to "needs review", not take down lead capture.
- * Losing a lead is the failure this whole system exists to prevent.
- */
-/** The configured failover target, or null. Exposed so tooling can report it. */
-export function configuredFallback(): ProviderName | null {
-  return fallbackProvider()
+/** The configured failover chain, in order. Exposed so tooling can report it. */
+export function configuredFallbacks(): ProviderName[] {
+  return fallbackProviders()
 }
 
 /**
@@ -588,74 +600,89 @@ export async function probeProvider(
   return dispatch(name, req)
 }
 
+/**
+ * Generate structured JSON, walking the provider chain and degrading to the
+ * stub only once every configured provider has refused.
+ *
+ * Degrading rather than throwing is deliberate: an exhausted quota should cost
+ * a lead its analysis, not its existence. Losing a lead is the failure this
+ * whole system was built to prevent.
+ *
+ * One rule here is worth stating because the obvious version is wrong. The
+ * chain advances on *any* provider failure, not only a retryable one. That
+ * looks careless — a 400 is our bug and a 401 is a bad key, neither of which a
+ * second attempt fixes — but `retryable` answers "would trying this provider
+ * again help", which is a different question from "would trying a different
+ * provider help". Today's outage was a 404: gemini-2.5-flash retired for new
+ * keys. Non-retryable, and a working Groq key would have carried every one of
+ * those requests. Gating failover on `retryable` is precisely what would have
+ * let a dead model name take the assistant down.
+ *
+ * `retryable` is still recorded, because it tells an operator whether to wait
+ * or to go and fix something.
+ */
 export async function generateStructured(
   req: GenerateRequest,
 ): Promise<GenerateResult> {
   const primary = activeProvider()
+  const chain: ProviderName[] = [primary, ...fallbackProviders()]
 
-  try {
-    return await dispatch(primary, req)
-  } catch (error) {
-    const fallback = fallbackProvider()
-    const retryable = error instanceof ProviderError ? error.retryable : true
+  const failures: string[] = []
 
-    /**
-     * Log the real reason before degrading.
-     *
-     * Without this the failure is invisible: the caller gets usable stub
-     * output, the run is labelled honestly in the UI, and nothing anywhere
-     * says *why*. A misconfigured key and a rate limit then look identical
-     * from the outside, and the first is a five-second fix.
-     */
-    console.error(
-      `[ai] ${primary} failed (retryable=${retryable}):`,
-      error instanceof Error ? error.message : String(error),
-    )
-
-    const describe = (who: string, err: unknown) =>
-      `${who}: ${err instanceof Error ? err.message : String(err)}`
-
-    /** Every link that failed, in order, so the whole chain is reportable. */
-    const failures = [describe(primary, error)]
-
-    if (fallback && retryable) {
-      console.warn(`[ai] rolling over from ${primary} to ${fallback}`)
-      try {
-        const result = await dispatch(fallback, req)
-        console.warn(`[ai] ${fallback} answered; ${primary} was skipped`)
-        return result
-      } catch (fallbackError) {
-        console.error(`[ai] fallback ${fallback} also failed:`, fallbackError)
-        failures.push(describe(fallback, fallbackError))
+  for (const [index, provider] of chain.entries()) {
+    try {
+      const result = await dispatch(provider, req)
+      if (index > 0) {
+        console.warn(
+          `[ai] ${provider} answered after ${index} provider(s) failed`,
+        )
       }
-    } else if (!fallback && retryable) {
+      return result
+    } catch (error) {
+      const retryable =
+        error instanceof ProviderError ? error.retryable : true
+      const message =
+        error instanceof Error ? error.message : String(error)
+
       /**
-       * Worth saying out loud. This failure was the kind a second provider
-       * would have absorbed — a rate limit, a quota, an outage — and the only
-       * reason the lead is about to read NEEDS_REVIEW is that no failover is
-       * configured. That is a settings problem, not a model problem, and it
-       * should not have to be inferred.
+       * Log every link as it breaks.
+       *
+       * Without this the failure is invisible: the caller still gets usable
+       * stub output, so a misconfigured key and an exhausted quota look
+       * identical from outside — and only one of them is a five-second fix.
        */
-      console.warn(
-        `[ai] ${primary} failed retryably and no AI_FALLBACK_PROVIDER is set — ` +
-          `a second provider would have absorbed this`,
-      )
-    }
+      console.error(`[ai] ${provider} failed (retryable=${retryable}):`, message)
+      failures.push(`${provider}: ${message}`)
 
-    if (primary !== "stub") {
-      console.warn(
-        `[ai] degrading to stub output — this lead will read as NEEDS_REVIEW`,
-      )
-      const stubbed = await callStub(req)
-      const unprotected =
-        retryable && !fallback ? " (no AI_FALLBACK_PROVIDER configured)" : ""
-      return {
-        ...stubbed,
-        model: `stub (after ${failures.length > 1 ? "all providers" : primary} failed)`,
-        degradedReason: failures.join(" | ") + unprotected,
-      }
+      const next = chain[index + 1]
+      if (next) console.warn(`[ai] rolling over from ${provider} to ${next}`)
     }
+  }
 
-    throw error
+  // Every configured provider refused. The stub is the floor, not a provider.
+  if (primary === "stub") {
+    throw new Error(failures[0] ?? "stub provider failed")
+  }
+
+  console.warn(
+    `[ai] all ${chain.length} provider(s) failed — degrading to stub output; ` +
+      `this lead will read as NEEDS_REVIEW`,
+  )
+
+  /**
+   * Say when the chain was one link long.
+   *
+   * A single-provider setup that runs out looks the same on the lead as a
+   * fully-protected one that got unlucky, and they call for completely
+   * different responses: add a fallback, versus wait.
+   */
+  const unprotected =
+    chain.length === 1 ? " (no AI_FALLBACK_PROVIDER configured)" : ""
+
+  const stubbed = await callStub(req)
+  return {
+    ...stubbed,
+    model: `stub (after ${chain.length > 1 ? `all ${chain.length} providers` : primary} failed)`,
+    degradedReason: failures.join(" | ") + unprotected,
   }
 }
