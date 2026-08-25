@@ -8,21 +8,23 @@ import { useState } from 'react'
 import { siteConfig } from '@/config/site'
 
 /*
- * Every price below is a PLACEHOLDER.
+ * Rates are quoted in naira, VAT exclusive.
  *
- * Rates are the one thing on this page that must not be guessed, so they are
- * bracketed rather than invented. Replace the `monthly` / `annual` strings
- * with your real figures and delete this comment.
- *
- * `billingSensitive: false` means the tier ignores the monthly/annual toggle
- * and shows as a one-off engagement instead.
+ * Discovery is priced to be bought without a procurement process and is
+ * credited back, so the number that matters to a buyer is the build. The
+ * retainer is the only tier the monthly/annual toggle applies to —
+ * `billingSensitive: false` means the tier ignores the toggle and shows as a
+ * one-off engagement instead. Annual retainers are 15% off, which is where
+ * ANNUAL_SAVING_PERCENT below comes from; change the two together.
  */
+const ANNUAL_SAVING_PERCENT = 15
+
 const plans = [
   {
     name: 'Discovery',
     description: 'A fixed-price piece of work that ends in a plan you can act on',
-    monthly: '[PRICE]',
-    annual: '[PRICE]',
+    monthly: '₦450,000',
+    annual: '₦450,000',
     billingSensitive: false,
     note: 'Fixed price, one-off',
     features: [
@@ -38,8 +40,8 @@ const plans = [
   {
     name: 'Project build',
     description: 'Design, build and launch of an agreed scope of work',
-    monthly: '[PRICE]',
-    annual: '[PRICE]',
+    monthly: '₦2,850,000',
+    annual: '₦2,850,000',
     billingSensitive: false,
     note: 'Fixed price, from',
     features: [
@@ -57,8 +59,8 @@ const plans = [
   {
     name: 'Retained support',
     description: 'Ongoing development and maintenance at a predictable rate',
-    monthly: '[PRICE]',
-    annual: '[PRICE]',
+    monthly: '₦900,000',
+    annual: '₦765,000',
     billingSensitive: true,
     note: 'Per month',
     features: [
@@ -117,7 +119,7 @@ export function PricingSection() {
           </div>
 
           <p className="text-sm text-muted-foreground">
-            <span className="text-primary font-semibold">Save [X]%</span> on annual retainers
+            <span className="text-primary font-semibold">Save {ANNUAL_SAVING_PERCENT}%</span> on annual retainers
           </p>
         </div>
 

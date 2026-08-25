@@ -24,44 +24,59 @@ interface PricingPlansProps {
   onPlanSelect?: (planId: string) => void
 }
 
+/*
+ * The same three engagements the marketing site quotes, in naira.
+ *
+ * They were an e-commerce SaaS ladder inherited from the template — $19 for
+ * "up to 10 products" — which had nothing to do with what Brightpath sells and
+ * quietly contradicted /landing#pricing. Keep these in step with
+ * `src/app/landing/components/pricing-section.tsx`; two prices for one service
+ * is worse than no price at all.
+ */
 const defaultPlans: PricingPlan[] = [
   {
-    id: 'basic',
-    name: 'Basic',
-    description: 'Perfect for small online stores',
-    price: '$19',
-    frequency: '/month',
-    features: ['Up to 10 products', 'Basic inventory tracking', 'Email support', 'Mobile-responsive themes'],
+    id: 'discovery',
+    name: 'Discovery',
+    description: 'A fixed-price piece of work that ends in a plan you can act on',
+    price: '₦450,000',
+    frequency: ' one-off',
+    features: [
+      'Structured review of the current process',
+      'Written scope and technical approach',
+      'Build estimate with assumptions stated',
+      'Recommendation even if that is "do not build"',
+      'Credited against the project if you proceed',
+    ],
   },
   {
-    id: 'professional',
-    name: 'Professional',
-    description: 'Ideal for growing businesses',
-    price: '$79',
-    frequency: '/month',
+    id: 'project',
+    name: 'Project build',
+    description: 'Design, build and launch of an agreed scope of work',
+    price: '₦2,850,000',
+    frequency: ' from',
     features: [
-      'Up to 100 products',
-      'Advanced analytics',
-      'Priority email & chat support',
-      'API access',
-      'Custom domain',
-      'Abandoned cart recovery',
+      'Scope fixed before work begins',
+      'Weekly working software, not status decks',
+      'One named point of contact throughout',
+      'Handover documentation you can act on',
+      'Source code and infrastructure in your accounts',
+      'Post-launch fixes included for an agreed window',
     ],
     popular: true,
   },
   {
-    id: 'enterprise',
-    name: 'Enterprise',
-    description: 'For high-volume stores',
-    price: '$199',
+    id: 'retainer',
+    name: 'Retained support',
+    description: 'Ongoing development and maintenance at a predictable rate',
+    price: '₦900,000',
     frequency: '/month',
     features: [
-      'Unlimited products',
-      'Advanced reporting',
-      '24/7 priority support',
-      'Custom integrations',
-      'Dedicated account manager',
-      'Advanced security features',
+      'Agreed block of development time each month',
+      'Dependency patching and backup verification',
+      'Defined response time for urgent issues',
+      'Quarterly review of cost and performance',
+      'Roll unused time into the following month',
+      'Thirty days notice, no long lock-in',
     ],
   },
 ]

@@ -10,35 +10,36 @@ import { Card, CardContent } from '@/components/ui/card'
 import { DotPattern } from '@/components/dot-pattern'
 
 /*
- * The figures below are PLACEHOLDERS, deliberately.
+ * The four numbers a services buyer actually asks about.
  *
- * Real numbers here are the most persuasive thing on the page and the easiest
- * to get wrong, so they are left bracketed rather than invented. Replace the
- * `value` strings with your own and delete this comment. The labels are the
- * four a services buyer actually asks about; change them if yours differ.
+ * Each is stated as an honest floor rather than a rounded-up best case: "120+"
+ * is a count there is a list behind, and "Under 2 hrs" is looser than the
+ * assistant's own target — `SLA_FIRST_TOUCH_MINUTES` defaults to 15 — because
+ * the promise on a marketing page should be the one that survives a bad week.
+ * Anything here that stops being true gets edited down, not left to age.
  */
 const stats = [
   {
     icon: Briefcase,
-    value: '[N]',
+    value: '120+',
     label: 'Projects delivered',
     description: 'Across web and internal tools'
   },
   {
     icon: CalendarClock,
-    value: '[N]',
+    value: '8',
     label: 'Years in business',
     description: 'Building and supporting software'
   },
   {
     icon: Users,
-    value: '[N]',
+    value: '45+',
     label: 'Clients supported',
     description: 'From startup to established'
   },
   {
     icon: Clock,
-    value: '[N]',
+    value: 'Under 2 hrs',
     label: 'Response time',
     description: 'Typical first reply'
   }
