@@ -30,6 +30,7 @@ Rules:
 - One clear ask, matched to what they asked for. Do not stack requests.
 - Plain professional English. No "I hope this email finds you well", no exclamation marks, no invented enthusiasm.
 - Sign off as "The BrightPath Team". Never sign a specific person's name.
+- Lay it out as an email, not one block of prose: greeting on its own line, a blank line before the sign-off, and the team name on the line below it.
 - If the facts are too thin to personalise honestly, write a brief message that asks for the missing detail instead of padding with flattery.
 
 Return the subject line, the message body, and the list of signals you actually referenced.`
@@ -81,6 +82,52 @@ function factSheet(evidence: Evidence, contactName: string | null): string {
   return `Confirmed facts:\n${lines.join("\n")}${notes}`
 }
 
+/**
+ * Put the email back into paragraphs.
+ *
+ * Structured JSON output has a strong pull toward a single unbroken string —
+ * asked for a "message", models reliably return one long line — and the result
+ * arrives in someone's inbox reading "...available this week? Best regards, The
+ * BrightPath Team" with the sign-off welded to the last sentence. The prompt
+ * now asks for line breaks, but a prompt is a request rather than a guarantee,
+ * so the shape is enforced here instead.
+ *
+ * Only whitespace is touched. No word is added, removed, or reordered — this
+ * runs on model output that has already been validated, and quietly rewriting
+ * the wording would put prose in the message that nothing has checked.
+ */
+const GREETING = /^((?:Hi|Hello|Dear|Good morning|Good afternoon)\b[^,\n]{0,60},)\s*/i
+const SIGN_OFF =
+  /\s*\b((?:Best regards|Kind regards|Warm regards|Regards|Many thanks|Thanks|Thank you))\s*,?\s*(The BrightPath Team)\.?\s*$/i
+
+export function tidyMessage(raw: string): string {
+  let text = (raw ?? "").replace(/\r\n?/g, "\n").trim()
+  if (!text) return text
+
+  // Peel the sign-off off the end first, so the greeting match cannot reach it.
+  let signOff = ""
+  const closing = text.match(SIGN_OFF)
+  if (closing) {
+    signOff = `${closing[1]},\n${closing[2]}`
+    text = text.slice(0, closing.index).trim()
+  }
+
+  let greeting = ""
+  const opening = text.match(GREETING)
+  if (opening) {
+    greeting = opening[1]
+    text = text.slice(opening[0].length).trim()
+  }
+
+  const body = text
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+
+  return [greeting, body, signOff].filter(Boolean).join("\n\n")
+}
+
 export interface WriteResult {
   draft: FollowUpDraft
   provider: string
@@ -126,8 +173,8 @@ export async function writeFollowUp(
     : []
 
   const parsed = followUpDraftSchema.safeParse({
-    subject: typeof raw.subject === "string" ? raw.subject : "Following up",
-    message: typeof raw.message === "string" ? raw.message : "",
+    subject: typeof raw.subject === "string" ? raw.subject.trim() : "Following up",
+    message: typeof raw.message === "string" ? tidyMessage(raw.message) : "",
     grounded_in: grounded,
     generated_at: new Date().toISOString(),
     model: `${result.provider}:${result.model}`,

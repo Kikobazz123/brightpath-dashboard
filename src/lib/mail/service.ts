@@ -1,6 +1,7 @@
 import { siteConfig } from "@/config/site"
 import type { Lead } from "@/lib/contracts/leads"
 import { confirmSend, logActivity } from "@/lib/leads/service"
+import { tidyMessage } from "@/lib/pipeline/writer"
 
 import {
   enquiryAcknowledgement,
@@ -143,10 +144,19 @@ export async function sendFollowUp(
     }
   }
 
+  /**
+   * Re-tidy on the way out.
+   *
+   * `writeFollowUp` already formats what it generates, but drafts written
+   * before that existed are still sitting in the database as one unbroken
+   * paragraph with the sign-off welded to the last sentence. Running it again
+   * here fixes those on send without anyone having to regenerate them, and is
+   * a no-op for text that is already laid out.
+   */
   const result = await sendMail({
     to,
     subject: draft.subject,
-    text: draft.message,
+    text: tidyMessage(draft.message),
   })
 
   if (!result.ok) {
