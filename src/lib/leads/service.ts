@@ -1,10 +1,11 @@
-import { and, count, desc, asc, eq, ilike, or, sql } from "drizzle-orm"
+import { and, count, desc, asc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 
 import {
   type Activity,
   type ActivityType,
   type CreateLeadInput,
   type Lead,
+  type LeadSource,
   type LeadSummary,
   type ListLeadsQuery,
   type PipelineStats,
@@ -253,6 +254,37 @@ export async function listLeads(
   }
 
   return { leads: summaries, total }
+}
+
+/**
+ * Full leads, newest first — what the Inbox renders.
+ *
+ * Separate from `listLeads` because that one deliberately returns summaries:
+ * a table showing thirty rows has no use for thirty copies of the raw enquiry
+ * text and the whole evidence blob. The Inbox is the opposite case — the
+ * message body *is* the view — so it takes the full rows and pays for them.
+ *
+ * `sources` narrows to particular intake channels. The Inbox uses it to
+ * separate what arrived through the website from what a rep typed up after a
+ * phone call, which is the distinction a person scanning an inbox cares about.
+ */
+export async function listLeadMessages(
+  tenantId: string,
+  options: { sources?: readonly LeadSource[]; limit?: number } = {},
+): Promise<Lead[]> {
+  const filters = [eq(leads.tenantId, tenantId)]
+  if (options.sources?.length) {
+    filters.push(inArray(leads.source, [...options.sources]))
+  }
+
+  const rows = await getDb()
+    .select()
+    .from(leads)
+    .where(and(...filters))
+    .orderBy(desc(leads.createdAt))
+    .limit(options.limit ?? 100)
+
+  return rows.map(toLead)
 }
 
 export async function getActivity(

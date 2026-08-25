@@ -16,6 +16,7 @@ import { cache } from "react"
 import type {
   Activity,
   Lead,
+  LeadSource,
   LeadSummary,
   ListLeadsQuery,
   Pagination,
@@ -27,6 +28,7 @@ import {
   getActivity,
   getLead,
   getStats,
+  listLeadMessages,
   listLeads,
 } from "@/lib/leads/service"
 
@@ -99,3 +101,19 @@ export async function fetchLeadOrNull(id: string): Promise<Lead | null> {
 export const fetchActivity = cache(async (id: string): Promise<Activity[]> => {
   return getActivity(tenantId(), id)
 })
+
+/**
+ * Everything that arrived, newest first — the Inbox.
+ *
+ * Full leads rather than summaries, because the message body is the point of
+ * the view. Capped, because an inbox is a place you scan rather than paginate.
+ */
+export const fetchInbox = cache(
+  async (sourcesJson = "[]"): Promise<Lead[]> => {
+    const sources = JSON.parse(sourcesJson) as LeadSource[]
+    return listLeadMessages(tenantId(), {
+      sources: sources.length ? sources : undefined,
+      limit: 100,
+    })
+  },
+)

@@ -14,6 +14,12 @@ interface NavProps {
     label?: string;
     icon: LucideIcon;
     variant: "default" | "ghost";
+    /**
+     * What the entry does. These were inert buttons in the template — folders
+     * that could be clicked and never changed anything. Each one now selects a
+     * filter over the messages actually in the inbox.
+     */
+    onClick?: () => void;
   }[];
 }
 
@@ -29,6 +35,9 @@ export function Nav({ links, isCollapsed }: NavProps) {
             <Tooltip key={index} delayDuration={0}>
               <TooltipTrigger asChild>
                 <button
+                  type="button"
+                  onClick={link.onClick}
+                  aria-current={link.variant === "default" ? "page" : undefined}
                   className={cn(
                     buttonVariants({ variant: link.variant, size: "icon" }),
                     "size-9 cursor-pointer",
@@ -52,6 +61,9 @@ export function Nav({ links, isCollapsed }: NavProps) {
           ) : (
             <button
               key={index}
+              type="button"
+              onClick={link.onClick}
+              aria-current={link.variant === "default" ? "page" : undefined}
               className={cn(
                 buttonVariants({ variant: link.variant, size: "sm" }),
                 link.variant === "default" &&

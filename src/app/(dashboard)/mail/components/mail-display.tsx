@@ -1,191 +1,154 @@
 "use client"
 
-import { addDays } from "date-fns";
-import { addHours } from "date-fns";
 import { format } from "date-fns";
-import { nextSaturday } from "date-fns";
-import {
-  Archive,
-  ArchiveX,
-  Clock,
-  Forward,
-  MoreVertical,
-  Reply,
-  ReplyAll,
-  Trash2,
-} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ExternalLink, Loader2, Send } from "lucide-react";
+import { toast } from "sonner";
 
-import { DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { type Mail } from "../data";
-import { useState } from "react";
+import { replyToEnquiry } from "@/lib/client/actions";
+import { type InboxMessage } from "../inbox-data";
+import { useState, useTransition } from "react";
+
+/**
+ * The reading pane.
+ *
+ * The toolbar that used to run across the top — archive, junk, trash, snooze
+ * with a date picker, reply-all, forward, and a "Mute thread" switch — was
+ * eight controls, none of which did anything to anything. They are gone. What
+ * is left are the two actions that work: open the underlying lead, and reply.
+ *
+ * The reply box sends for real, through the connected mailbox, to the address
+ * on the lead. With no mailbox connected it says so and stays disabled rather
+ * than accepting text it cannot deliver.
+ */
 
 interface MailDisplayProps {
-  mail: Mail | null;
+  mail: InboxMessage | null;
+  mailConfigured: boolean;
 }
 
-export function MailDisplay({ mail }: MailDisplayProps) {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+export function MailDisplay({ mail, mailConfigured }: MailDisplayProps) {
+  const router = useRouter();
+  const [reply, setReply] = useState("");
+  const [isSending, startSending] = useTransition();
+
+  const hasAddress = mail !== null && mail.email.includes("@");
+  const canSend = mailConfigured && hasAddress && reply.trim().length > 0;
+
+  function send() {
+    if (!mail) return;
+
+    startSending(async () => {
+      const result = await replyToEnquiry(
+        mail.leadId,
+        `Re: ${mail.subject}`,
+        reply,
+      );
+
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success(result.message);
+      setReply("");
+      router.refresh();
+    });
+  }
+
+  if (!mail) {
+    return (
+      <div className="text-muted-foreground p-8 text-center text-sm">
+        Select an enquiry to read it.
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center p-2">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" disabled={!mail} title="Archive" className="cursor-pointer disabled:cursor-not-allowed">
-            <Archive className="size-4" />
-            <span className="sr-only">Archive</span>
-          </Button>
-          <Button variant="ghost" size="icon" disabled={!mail} title="Move to junk" className="cursor-pointer disabled:cursor-not-allowed">
-            <ArchiveX className="size-4" />
-            <span className="sr-only">Move to junk</span>
-          </Button>
-          <Button variant="ghost" size="icon" disabled={!mail} title="Move to trash" className="cursor-pointer disabled:cursor-not-allowed">
-            <Trash2 className="size-4" />
-            <span className="sr-only">Move to trash</span>
-          </Button>
-          <Separator orientation="vertical" className="mx-1 h-6" />
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" disabled={!mail} title="Snooze" className="cursor-pointer disabled:cursor-not-allowed">
-                <Clock className="size-4" />
-                <span className="sr-only">Snooze</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="flex w-auto p-0">
-              <div className="flex flex-col gap-2 border-r px-2 py-4">
-                <div className="px-4 text-sm font-medium">Snooze until</div>
-                <div className="grid min-w-[250px] gap-1">
-                  <Button variant="ghost" className="justify-start font-normal cursor-pointer">
-                    Later today{" "}
-                    <span className="text-muted-foreground ml-auto">
-                      {format(addHours(selectedDate, 4), "E, h:mm b")}
-                    </span>
-                  </Button>
-                  <Button variant="ghost" className="justify-start font-normal cursor-pointer">
-                    Tomorrow
-                    <span className="text-muted-foreground ml-auto">
-                      {format(addDays(selectedDate, 1), "E, h:mm b")}
-                    </span>
-                  </Button>
-                  <Button variant="ghost" className="justify-start font-normal cursor-pointer">
-                    This weekend
-                    <span className="text-muted-foreground ml-auto">
-                      {format(nextSaturday(selectedDate), "E, h:mm b")}
-                    </span>
-                  </Button>
-                  <Button variant="ghost" className="justify-start font-normal cursor-pointer">
-                    Next week
-                    <span className="text-muted-foreground ml-auto">
-                      {format(addDays(selectedDate, 7), "E, h:mm b")}
-                    </span>
-                  </Button>
-                </div>
-              </div>
-              <div className="p-2">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  classNames={{
-                    today: "bg-none",
-                    day: "cursor-pointer",
-                    day_selected: "cursor-pointer",
-                    day_today: "cursor-pointer"
-                  }}
-                  required
-                />
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" size="icon" disabled={!mail} title="Reply" className="cursor-pointer disabled:cursor-not-allowed">
-            <Reply className="size-4" />
-            <span className="sr-only">Reply</span>
-          </Button>
-          <Button variant="ghost" size="icon" disabled={!mail} title="Reply all" className="cursor-pointer disabled:cursor-not-allowed">
-            <ReplyAll className="size-4" />
-            <span className="sr-only">Reply all</span>
-          </Button>
-          <Button variant="ghost" size="icon" disabled={!mail} title="Forward" className="cursor-pointer disabled:cursor-not-allowed">
-            <Forward className="size-4" />
-            <span className="sr-only">Forward</span>
-          </Button>
-        </div>
-        <Separator orientation="vertical" className="mx-2 h-6" />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" disabled={!mail} className="cursor-pointer disabled:cursor-not-allowed">
-              <MoreVertical className="size-4" />
-              <span className="sr-only">More</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem className="cursor-pointer">Mark as unread</DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer">Star thread</DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer">Add label</DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer">Mute thread</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <div className="flex items-center gap-2 p-2">
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/leads/${mail.leadId}`}>
+            <ExternalLink className="size-4" />
+            Open lead
+          </Link>
+        </Button>
+        <span className="text-muted-foreground ml-auto pr-2 text-xs">
+          {format(new Date(mail.date), "PPpp")}
+        </span>
       </div>
       <Separator />
-      {mail ? (
-        <div className="flex flex-1 flex-col">
-          <div className="flex items-start p-4">
-            <div className="flex items-start gap-4 text-sm">
-              <Avatar className="cursor-pointer">
-                <AvatarImage alt={mail.name} />
-                <AvatarFallback>
-                  {mail.name
-                    .split(" ")
-                    .map((chunk) => chunk[0])
-                    .join("")}
-                </AvatarFallback>
-              </Avatar>
-              <div className="grid gap-1">
-                <div className="font-semibold">{mail.name}</div>
-                <div className="line-clamp-1 text-xs">{mail.subject}</div>
-                <div className="line-clamp-1 text-xs">
-                  <span className="font-medium">Reply-To:</span> {mail.email}
-                </div>
+
+      <div className="flex flex-1 flex-col">
+        <div className="flex items-start p-4">
+          <div className="flex items-start gap-4 text-sm">
+            <Avatar>
+              <AvatarImage alt={mail.name} />
+              <AvatarFallback>
+                {mail.name
+                  .split(" ")
+                  .map((chunk) => chunk[0])
+                  .join("")
+                  .slice(0, 2)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="grid gap-1">
+              <div className="font-semibold">{mail.name}</div>
+              <div className="line-clamp-1 text-xs">{mail.subject}</div>
+              <div className="line-clamp-1 text-xs">
+                <span className="font-medium">Reply-To:</span> {mail.email}
               </div>
             </div>
-            {mail.date && (
-              <div className="text-muted-foreground ml-auto text-xs">
-                {format(new Date(mail.date), "PPpp")}
-              </div>
-            )}
-          </div>
-          <Separator />
-          <div className="flex-1 p-4 text-sm whitespace-pre-wrap">{mail.text}</div>
-          <Separator className="mt-auto" />
-          <div className="p-4">
-            <form>
-              <div className="grid gap-4">
-                <Textarea className="p-4 cursor-text" placeholder={`Reply ${mail.name}...`} />
-                <div className="flex items-center">
-                  <Label htmlFor="mute" className="flex items-center gap-2 text-xs font-normal cursor-pointer">
-                    <Switch id="mute" aria-label="Mute thread" /> Mute this thread
-                  </Label>
-                  <Button onClick={(e) => e.preventDefault()} size="sm" className="ml-auto cursor-pointer">
-                    Send
-                  </Button>
-                </div>
-              </div>
-            </form>
           </div>
         </div>
-      ) : (
-        <div className="text-muted-foreground p-8 text-center">No message selected</div>
-      )}
+        <Separator />
+
+        <div className="flex-1 p-4 text-sm whitespace-pre-wrap">{mail.text}</div>
+        <Separator className="mt-auto" />
+
+        <div className="p-4">
+          <div className="grid gap-4">
+            <Textarea
+              className="p-4 cursor-text"
+              placeholder={
+                mailConfigured
+                  ? `Reply to ${mail.name}…`
+                  : "No mailbox is connected, so replies cannot be sent from here."
+              }
+              value={reply}
+              onChange={(event) => setReply(event.target.value)}
+              disabled={!mailConfigured || !hasAddress}
+            />
+            <div className="flex items-center gap-3">
+              <p className="text-muted-foreground text-xs">
+                {!mailConfigured
+                  ? "Set GMAIL_USER and GMAIL_APP_PASSWORD to send from here."
+                  : !hasAddress
+                    ? "This enquiry arrived without an email address."
+                    : `Sends to ${mail.email}. Recorded against the lead.`}
+              </p>
+              <Button
+                size="sm"
+                className="ml-auto cursor-pointer"
+                onClick={send}
+                disabled={!canSend || isSending}
+              >
+                {isSending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Send className="size-4" />
+                )}
+                {isSending ? "Sending…" : "Send"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

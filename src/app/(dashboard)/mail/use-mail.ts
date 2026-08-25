@@ -1,15 +1,22 @@
 import { create } from "zustand";
-import type { Mail } from "./data";
-import { mails } from "./data";
 
 interface Config {
-  selected: Mail["id"] | null;
+  selected: string | null;
 }
 
+/**
+ * Which enquiry the reading pane is showing.
+ *
+ * Starts empty. It used to be seeded with `mails[0].id` from the demo data,
+ * which cannot work once the list comes from the database — the id would name
+ * a message that does not exist, and the pane would open blank with no
+ * explanation. Nothing selected is the honest initial state, and the pane says
+ * so.
+ */
 const useMailStore = create<
   Config & { setState: (newState: Partial<Config>) => void }
 >((set) => ({
-  selected: mails[0].id,
+  selected: null,
   setState: (newState) => set((state) => ({ ...state, ...newState })),
 }));
 

@@ -6,15 +6,25 @@ import { formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import type { Mail } from "../data"
+import type { InboxMessage } from "../inbox-data"
 import { useMail } from "../use-mail"
 
 interface MailListProps {
-  items: Mail[];
+  items: InboxMessage[];
+  /** Shown when there is nothing to list. Says why, not just "no results". */
+  empty?: string;
 }
 
-export function MailList({ items }: MailListProps) {
+export function MailList({ items, empty = "Nothing here." }: MailListProps) {
   const [mail, setMail] = useMail();
+
+  if (items.length === 0) {
+    return (
+      <div className="text-muted-foreground p-8 text-center text-sm">
+        {empty}
+      </div>
+    );
+  }
 
   return (
     <ScrollArea className="h-[calc(100vh-12rem)]">
@@ -70,13 +80,22 @@ export function MailList({ items }: MailListProps) {
   );
 }
 
+/**
+ * The labels are now lead facts rather than the template's work/personal tags,
+ * so the mapping follows urgency: what needs acting on is filled, what is
+ * already handled is quiet, and everything else is neutral.
+ */
 function getBadgeVariantFromLabel(label: string): ComponentProps<typeof Badge>["variant"] {
-  if (["work"].includes(label.toLowerCase())) {
-    return "default";
+  if (["overdue", "high"].includes(label.toLowerCase())) {
+    return "destructive";
   }
 
-  if (["personal"].includes(label.toLowerCase())) {
+  if (["answered"].includes(label.toLowerCase())) {
     return "outline";
+  }
+
+  if (["medium", "draft ready"].includes(label.toLowerCase())) {
+    return "default";
   }
 
   return "secondary";
