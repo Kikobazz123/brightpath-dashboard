@@ -14,6 +14,13 @@ export const siteConfig = {
   /** Rendered under the brand name in the sidebar header. */
   sidebarSubtitle: "Admin Dashboard",
 
+  /**
+   * Who built this. Credited in both footers — the dashboard's and the
+   * marketing site's — which is why it lives here rather than being typed
+   * into each of them separately.
+   */
+  author: "Lordmark Dorgu",
+
   email: "Zaxellimited360@gmail.com",
 
   /** The signed-in account shown in the sidebar footer. Demo data. */

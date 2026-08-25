@@ -13,6 +13,15 @@ export const metadata: Metadata = {
     template: `%s — ${siteConfig.name}`,
   },
   description: siteConfig.tagline,
+
+  /**
+   * Authorship, in the machine-readable place for it. `creator` is who built
+   * the thing, `publisher` is whose name it goes out under — the same
+   * distinction the two footers make in prose.
+   */
+  authors: [{ name: siteConfig.author }],
+  creator: siteConfig.author,
+  publisher: siteConfig.name,
 };
 
 export default function RootLayout({

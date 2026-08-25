@@ -14,7 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Logo } from '@/components/logo'
-import { Mail, Linkedin, Heart } from 'lucide-react'
+import { Mail, Linkedin } from 'lucide-react'
 import { siteConfig } from '@/config/site'
 
 const newsletterSchema = z.object({
@@ -204,17 +204,26 @@ export function LandingFooter() {
 
         {/* Bottom Footer */}
         <div className="flex flex-col lg:flex-row justify-between items-center gap-2">
+          {/*
+            * The build credit. Was "Made with ♥ by Brightpath Solutions",
+            * which credited the client for work it did not do, followed by
+            * "© <year> for the developer community" — template residue from
+            * the theme this was forked from, and not true of a commercial
+            * services site.
+            */}
           <div className="flex flex-col sm:flex-row items-center gap-2 text-muted-foreground text-sm">
-            <div className="flex items-center gap-1">
-              <span>Made with</span>
-              <Heart className="h-4 w-4 text-red-500 fill-current" />
-              <span>by</span>
+            <div className="flex flex-wrap items-center justify-center gap-x-1.5">
+              <span>Made by</span>
+              <span className="font-semibold text-foreground">
+                {siteConfig.author}
+              </span>
+              <span>for</span>
               <a href={`mailto:${siteConfig.email}`} className="font-semibold text-foreground hover:text-primary transition-colors cursor-pointer">
                 {siteConfig.name}
               </a>
             </div>
             <span className="hidden sm:inline">•</span>
-            <span>© {new Date().getFullYear()} for the developer community</span>
+            <span>© {new Date().getFullYear()} {siteConfig.name}</span>
           </div>
           <div className="flex items-center space-x-4 text-sm text-muted-foreground mt-4 md:mt-0">
             <a href="#privacy" className="hover:text-foreground transition-colors">

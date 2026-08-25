@@ -15,9 +15,14 @@ workspace.
 
 ## The BrightPath application — not licensed for reuse
 
-Everything written for BrightPath Solutions is **© 2026 the repository owner.
-All rights reserved.** It is *not* covered by the MIT licence below, and no
-permission to copy, modify, or redistribute it is granted here.
+Everything written for BrightPath Solutions was authored by **Lordmark Dorgu**
+for Brightpath Solutions, and is **© 2026 the repository owner. All rights
+reserved.** It is *not* covered by the MIT licence below, and no permission to
+copy, modify, or redistribute it is granted here.
+
+Authorship and ownership are stated separately on purpose: naming who wrote
+something is not a claim about who holds the copyright in it, which is settled
+by the engagement terms rather than by this file.
 
 That includes, non-exhaustively:
 
