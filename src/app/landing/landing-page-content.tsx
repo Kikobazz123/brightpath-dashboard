@@ -1,6 +1,5 @@
 "use client"
 
-import React from 'react'
 import { LandingNavbar } from './components/navbar'
 import { HeroSection } from './components/hero-section'
 import { LogoCarousel } from './components/logo-carousel'
@@ -11,12 +10,15 @@ import { CTASection } from './components/cta-section'
 import { ContactSection } from './components/contact-section'
 import { FaqSection } from './components/faq-section'
 import { LandingFooter } from './components/footer'
-import { LandingThemeCustomizer, LandingThemeCustomizerTrigger } from './components/landing-theme-customizer'
 import { AboutSection } from './components/about-section'
 
+/*
+ * The floating theme-customizer gear was removed from the marketing site as
+ * well as the dashboard. On a page selling software services, a widget
+ * inviting visitors to recolour the site is a tell that they are looking at a
+ * template — the opposite of what the page is there to do.
+ */
 export function LandingPageContent({ signedIn = false }: { signedIn?: boolean }) {
-  const [themeCustomizerOpen, setThemeCustomizerOpen] = React.useState(false)
-
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
@@ -37,10 +39,6 @@ export function LandingPageContent({ signedIn = false }: { signedIn?: boolean })
 
       {/* Footer */}
       <LandingFooter />
-
-      {/* Theme Customizer */}
-      <LandingThemeCustomizerTrigger onClick={() => setThemeCustomizerOpen(true)} />
-      <LandingThemeCustomizer open={themeCustomizerOpen} onOpenChange={setThemeCustomizerOpen} />
     </div>
   )
 }

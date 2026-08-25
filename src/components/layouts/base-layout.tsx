@@ -4,8 +4,6 @@ import * as React from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
-import { ThemeCustomizer, ThemeCustomizerTrigger } from "@/components/theme-customizer"
-import { UpgradeToProButton } from "@/components/upgrade-to-pro-button"
 import { useSidebarConfig } from "@/hooks/use-sidebar-config"
 import {
   SidebarInset,
@@ -18,8 +16,12 @@ interface BaseLayoutProps {
   description?: string
 }
 
+/*
+ * The floating theme-customizer gear and "Start a project" button were removed
+ * here for the same reason as in `app/(dashboard)/layout.tsx`: both were
+ * template overlays that sat on top of real content on every screen.
+ */
 export function BaseLayout({ children, title, description }: BaseLayoutProps) {
-  const [themeCustomizerOpen, setThemeCustomizerOpen] = React.useState(false)
   const { config } = useSidebarConfig()
 
   return (
@@ -92,14 +94,6 @@ export function BaseLayout({ children, title, description }: BaseLayoutProps) {
           />
         </>
       )}
-      
-      {/* Theme Customizer */}
-      <ThemeCustomizerTrigger onClick={() => setThemeCustomizerOpen(true)} />
-      <ThemeCustomizer 
-        open={themeCustomizerOpen} 
-        onOpenChange={setThemeCustomizerOpen} 
-      />
-      <UpgradeToProButton />
     </SidebarProvider>
   )
 }

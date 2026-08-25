@@ -2,14 +2,10 @@
 
 import * as React from "react"
 import {
-  LayoutPanelLeft,
   LayoutDashboard,
   Mail,
   CheckSquare,
-  MessageCircle,
   Calendar,
-  Shield,
-  AlertTriangle,
   Settings,
   HelpCircle,
   CreditCard,
@@ -39,9 +35,19 @@ const data = {
   user: siteConfig.user,
   navGroups: [
     /**
-     * The assistant first. Everything below this group is template surface that
-     * came with the theme and is kept for reference — grouping it separately
-     * means a visitor can tell in one glance which screens are BrightPath.
+     * Three groups, each named for what a person came to do: work the pipeline,
+     * run the day, or change how the company is presented.
+     *
+     * The middle group used to be labelled "Template pages" and the routes were
+     * ordered by what the theme happened to ship — a second demo dashboard, a
+     * chat mock, sign-in and error galleries. Naming a group after where its
+     * code came from tells a client they are looking at a demo, and the entries
+     * that only existed to show off the template have been dropped.
+     *
+     * Dropping a link does not delete the route: /dashboard-2, /chat, the auth
+     * gallery and the error pages all still render if visited directly, and the
+     * error pages still do their real job when Next.js throws. They are simply
+     * no longer advertised as places to go.
      */
     {
       label: "Sales assistant",
@@ -64,15 +70,10 @@ const data = {
       ],
     },
     {
-      label: "Template pages",
+      label: "Workspace",
       items: [
         {
-          title: "Dashboard 2",
-          url: "/dashboard-2",
-          icon: LayoutPanelLeft,
-        },
-        {
-          title: "Mail",
+          title: "Inbox",
           url: "/mail",
           icon: Mail,
         },
@@ -82,100 +83,35 @@ const data = {
           icon: CheckSquare,
         },
         {
-          title: "Chat",
-          url: "/chat",
-          icon: MessageCircle,
-        },
-        {
           title: "Calendar",
           url: "/calendar",
           icon: Calendar,
         },
         {
-          title: "Users",
+          title: "Team",
           url: "/users",
           icon: Users,
         },
       ],
     },
     {
-      label: "Pages",
+      label: "Company",
       items: [
         {
-          title: "Landing",
+          title: "Website",
           url: "/landing",
           target: "_blank",
           icon: LayoutTemplate,
         },
         {
-          title: "Auth Pages",
-          url: "#",
-          icon: Shield,
-          items: [
-            {
-              title: "Sign In 1",
-              url: "/sign-in",
-            },
-            {
-              title: "Sign In 2",
-              url: "/sign-in-2",
-            },
-            {
-              title: "Sign In 3",
-              url: "/sign-in-3",
-            },
-            {
-              title: "Sign Up 1",
-              url: "/sign-up",
-            },
-            {
-              title: "Sign Up 2",
-              url: "/sign-up-2",
-            },
-            {
-              title: "Sign Up 3",
-              url: "/sign-up-3",
-            },
-            {
-              title: "Forgot Password 1",
-              url: "/forgot-password",
-            },
-            {
-              title: "Forgot Password 2",
-              url: "/forgot-password-2",
-            },
-            {
-              title: "Forgot Password 3",
-              url: "/forgot-password-3",
-            }
-          ],
+          title: "Pricing",
+          url: "/pricing",
+          icon: CreditCard,
         },
         {
-          title: "Errors",
-          url: "#",
-          icon: AlertTriangle,
-          items: [
-            {
-              title: "Unauthorized",
-              url: "/errors/unauthorized",
-            },
-            {
-              title: "Forbidden",
-              url: "/errors/forbidden",
-            },
-            {
-              title: "Not Found",
-              url: "/errors/not-found",
-            },
-            {
-              title: "Internal Server Error",
-              url: "/errors/internal-server-error",
-            },
-            {
-              title: "Under Maintenance",
-              url: "/errors/under-maintenance",
-            },
-          ],
+          title: "FAQs",
+          url: "/faqs",
+          icon: HelpCircle,
         },
         {
           title: "Settings",
@@ -183,20 +119,12 @@ const data = {
           icon: Settings,
           items: [
             {
-              title: "User Settings",
-              url: "/settings/user",
-            },
-            {
-              title: "Account Settings",
+              title: "Account",
               url: "/settings/account",
             },
             {
-              title: "Plans & Billing",
-              url: "/settings/billing",
-            },
-            {
-              title: "Appearance",
-              url: "/settings/appearance",
+              title: "Profile",
+              url: "/settings/user",
             },
             {
               title: "Notifications",
@@ -206,17 +134,15 @@ const data = {
               title: "Connections",
               url: "/settings/connections",
             },
+            {
+              title: "Appearance",
+              url: "/settings/appearance",
+            },
+            {
+              title: "Plans & Billing",
+              url: "/settings/billing",
+            },
           ],
-        },
-        {
-          title: "FAQs",
-          url: "/faqs",
-          icon: HelpCircle,
-        },
-        {
-          title: "Pricing",
-          url: "/pricing",
-          icon: CreditCard,
         },
       ],
     },

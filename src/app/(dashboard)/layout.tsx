@@ -5,16 +5,26 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { ThemeCustomizer, ThemeCustomizerTrigger } from "@/components/theme-customizer";
-import { UpgradeToProButton } from "@/components/upgrade-to-pro-button";
 import { useSidebarConfig } from "@/hooks/use-sidebar-config";
+
+/*
+ * Two floating overlays used to sit on top of every dashboard screen: the
+ * theme customizer's gear, pinned to the middle of the right edge, and a
+ * "Start a project" enquiry button in the bottom-right corner. Both were
+ * template furniture aimed at someone evaluating the theme, and both covered
+ * real content — the gear landed on table rows and the calendar grid. Removed
+ * rather than repositioned: an admin dashboard does not need a colour picker
+ * floating over it, and the people using it are already customers.
+ *
+ * The customizer component itself still exists at
+ * `@/components/theme-customizer` if it is ever wanted from Settings.
+ */
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [themeCustomizerOpen, setThemeCustomizerOpen] = React.useState(false);
   const { config } = useSidebarConfig();
 
   return (
@@ -65,14 +75,6 @@ export default function DashboardLayout({
           />
         </>
       )}
-
-      {/* Theme Customizer */}
-      <ThemeCustomizerTrigger onClick={() => setThemeCustomizerOpen(true)} />
-      <ThemeCustomizer
-        open={themeCustomizerOpen}
-        onOpenChange={setThemeCustomizerOpen}
-      />
-      <UpgradeToProButton />
     </SidebarProvider>
   );
 }
