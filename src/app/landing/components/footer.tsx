@@ -115,8 +115,20 @@ export function LandingFooter() {
                 <span className="font-bold text-xl">{siteConfig.name}</span>
               </a>
             </div>
+            {/*
+              * Was the upstream template vendor describing itself — "curated
+              * blocks, templates, landing pages ... for modern developers" —
+              * which described neither Brightpath nor its customers.
+              *
+              * Deliberately not a copy of the hero's paragraph, which says the
+              * same thing at length a few screens up. This is the short form,
+              * and it names the three things the Services column lists so the
+              * two halves of the footer agree with each other.
+              */}
             <p className="text-muted-foreground mb-6 max-lg:text-center max-lg:flex max-lg:justify-center">
-              Accelerating web development with curated blocks, templates, landing pages, and admin dashboards designed for modern developers.
+              Internal tools, integrations and full product builds for growing
+              companies — designed, built, and still supported by the same
+              people after launch.
             </p>
             <div className="flex space-x-4 max-lg:justify-center">
               {socialLinks.map((social) => (
