@@ -24,6 +24,12 @@
  *   setLeadStatus    → PATCH  /leads/{id}/status
  *   editLead         → PATCH  /leads/{id}
  *   captureLead      → POST   /leads
+ *
+ * Two actions have no API twin, because both send email and an unauthenticated
+ * caller must never be able to make this app send mail on its own account:
+ *
+ *   sendFollowUpEmail → sends the draft, then POST /leads/{id}/confirm-send
+ *   sendTestEmail     → one message to a given address, touches no lead
  */
 
 import { revalidatePath } from "next/cache"
@@ -44,6 +50,7 @@ import {
   NotFoundError,
   confirmSend,
   createLead,
+  getLead,
   runAnalysis,
   runFollowUp,
   runFullPipeline,
@@ -52,6 +59,13 @@ import {
   updateLead,
   updateStatus,
 } from "@/lib/leads/service"
+import {
+  acknowledgeEnquiry,
+  notifyNewEnquiry,
+  replyToLead,
+  sendFollowUp,
+  sendTestMessage,
+} from "@/lib/mail/service"
 import { tenantId } from "@/lib/client/server-data"
 
 /* ------------------------------------------------------------------ *
@@ -343,9 +357,11 @@ export async function captureLead(
   }
 
   const autoRun = formData.get("auto_run") === "on"
+  const notifyContact = formData.get("notify_contact") === "on"
 
   try {
     const lead = await createLead(tenantId(), parsed.data, actor())
+    let pipelineFailed = false
 
     if (autoRun) {
       // A failure here must not lose the lead — it is already saved, and the
@@ -354,24 +370,164 @@ export async function captureLead(
         await runFullPipeline(tenantId(), lead.id)
       } catch (error) {
         console.error("[action:capture:pipeline]", error)
-        revalidateLead(lead.id)
-        return {
-          ok: true,
-          data: { id: lead.id },
-          message:
-            "Lead captured, but the assistant could not finish. Re-run it from the lead.",
+        pipelineFailed = true
+      }
+    }
+
+    /**
+     * Mail, if the rep asked for it.
+     *
+     * Opt-in rather than automatic, and reported honestly. A rep capturing a
+     * phone call has usually just spoken to the person, so an unbidden "thanks
+     * for your enquiry" would be odd; a rep testing the mailing automation
+     * wants to see something land in a real inbox. The checkbox is which of
+     * those this is.
+     *
+     * A mail failure never turns capture into a failure, but unlike the public
+     * form it is surfaced, because the person who ticked the box is the person
+     * who can go and fix the credentials.
+     */
+    let mailNote = ""
+    if (notifyContact) {
+      try {
+        const captured = await getLead(tenantId(), lead.id)
+        const [alert, ack] = await Promise.all([
+          notifyNewEnquiry(captured),
+          acknowledgeEnquiry(captured),
+        ])
+
+        const failure =
+          (alert.attempted && !alert.ok && alert.reason) ||
+          (ack.attempted && !ack.ok && ack.reason)
+
+        if (failure) {
+          mailNote = ` Email did not go out: ${failure}`
+        } else if (!alert.attempted && !ack.attempted) {
+          mailNote =
+            " No mailbox is connected, so nothing was emailed — set GMAIL_USER and GMAIL_APP_PASSWORD."
+        } else {
+          mailNote = ack.ok
+            ? ` Emailed ${captured.contact.email}.`
+            : " Notified the team inbox."
         }
+      } catch (error) {
+        console.error("[action:capture:mail]", error)
+        mailNote = " The lead was saved, but the email step failed."
       }
     }
 
     revalidateLead(lead.id)
+
+    if (pipelineFailed) {
+      return {
+        ok: true,
+        data: { id: lead.id },
+        message:
+          "Lead captured, but the assistant could not finish. Re-run it from the lead." +
+          mailNote,
+      }
+    }
+
     return {
       ok: true,
       data: { id: lead.id },
-      message: autoRun ? "Lead captured and assessed." : "Lead captured.",
+      message:
+        (autoRun ? "Lead captured and assessed." : "Lead captured.") + mailNote,
     }
   } catch (error) {
     return describe(error, "capture that lead")
+  }
+}
+
+/**
+ * Send the drafted follow-up for real.
+ *
+ * The counterpart to `markFollowUpSent`, which records a send a rep performed
+ * elsewhere. This one performs it, and the proof it stores is the message id
+ * the mail server returned rather than one typed in by hand. If the send
+ * fails, nothing is recorded and the lead stays `drafted`.
+ */
+export async function sendFollowUpEmail(
+  id: string,
+): Promise<ActionResult<Lead>> {
+  try {
+    const lead = await getLead(tenantId(), id)
+    const result = await sendFollowUp(tenantId(), lead, actor())
+
+    if (!result.ok) {
+      return { ok: false, message: result.reason }
+    }
+
+    revalidateLead(id)
+    return {
+      ok: true,
+      data: result.lead,
+      message: `Sent to ${lead.contact.email}. Recorded with the provider's message id.`,
+    }
+  } catch (error) {
+    return describe(error, "send that follow-up")
+  }
+}
+
+/**
+ * Reply to an enquiry from the Inbox.
+ *
+ * Sends what the rep typed, and deliberately leaves `follow_up_state` alone. A
+ * hand-written reply is correspondence; the drafted follow-up is a specific
+ * message the assistant wrote. Letting one flip the state of the other would
+ * make `sent` a claim about a message nobody can point to.
+ */
+export async function replyToEnquiry(
+  leadId: string,
+  subject: string,
+  body: string,
+): Promise<ActionResult<void>> {
+  if (!body.trim()) {
+    return { ok: false, message: "The reply is empty." }
+  }
+
+  try {
+    const lead = await getLead(tenantId(), leadId)
+    const result = await replyToLead(lead, subject, body)
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        message: result.reason ?? "The reply could not be sent.",
+      }
+    }
+
+    revalidateLead(leadId)
+    revalidatePath("/mail")
+    return {
+      ok: true,
+      data: undefined,
+      message: `Reply sent to ${lead.contact.email}.`,
+    }
+  } catch (error) {
+    return describe(error, "send that reply")
+  }
+}
+
+/** Sends one plain message to any address, to prove the mailbox is connected. */
+export async function sendTestEmail(to: string): Promise<ActionResult<void>> {
+  const address = to.trim()
+  if (!address.includes("@")) {
+    return { ok: false, message: "That does not look like an email address." }
+  }
+
+  const result = await sendTestMessage(address)
+  if (!result.ok) {
+    return {
+      ok: false,
+      message: result.reason ?? "The message could not be sent.",
+    }
+  }
+
+  return {
+    ok: true,
+    data: undefined,
+    message: `Test message sent to ${address}.`,
   }
 }
 

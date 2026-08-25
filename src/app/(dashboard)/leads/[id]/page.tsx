@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { fetchActivity, fetchLeadOrNull } from "@/lib/client/server-data"
 import { leadTitle } from "@/lib/leads/display"
+import { isMailConfigured } from "@/lib/mail/transport"
 
 import { ActivityTimeline } from "./components/activity-timeline"
 import { DispositionControl } from "./components/disposition-control"
@@ -123,6 +124,7 @@ export default async function LeadDetailPage({
             draft={lead.follow_up}
             state={lead.follow_up_state}
             contactEmail={lead.contact.email}
+            mailConfigured={isMailConfigured()}
           />
           <NextActionPanel action={lead.next_action} />
         </div>

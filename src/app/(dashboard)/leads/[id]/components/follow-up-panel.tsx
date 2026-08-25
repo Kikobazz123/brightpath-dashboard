@@ -3,21 +3,24 @@
 /**
  * The drafted follow-up.
  *
- * The draft is presented as something a rep sends, never as something the
- * system has sent. There is no "Send" button, because this build has no email
- * integration and a button that only flipped a database column would be the
- * single most damaging lie the app could tell — the case study is about leads
- * going cold, and a false "sent" is how that happens invisibly.
+ * "Send now" performs a real SMTP send through the connected mailbox and only
+ * then records the state, storing the message id the server handed back. That
+ * ordering is the whole rule this panel is built around: `sent` is reachable
+ * only with proof of delivery, and a button that merely flipped a database
+ * column would be the most damaging lie the app could tell — the case study is
+ * about leads going cold, and a false "sent" is how that happens invisibly.
  *
- * Instead: copy the message, send it from your own client, then record the send
- * with the provider's message id. That id is the proof, and `sent` is
- * unreachable without it.
+ * The manual path is kept alongside it, and is not a fallback. A rep who sends
+ * from their own client pastes that client's message id into "Record a send",
+ * which satisfies the same contract by hand. When no mailbox is connected, that
+ * is the only route, and the panel says so rather than offering a button that
+ * cannot work.
  */
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Check, Copy, Loader2, ShieldCheck } from "lucide-react"
+import { Check, Copy, Loader2, Send, ShieldCheck } from "lucide-react"
 
 import { FollowUpBadge } from "@/components/leads/badges"
 import { Badge } from "@/components/ui/badge"
@@ -41,7 +44,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { markFollowUpSent } from "@/lib/client/actions"
+import { markFollowUpSent, sendFollowUpEmail } from "@/lib/client/actions"
 import type { FollowUpDraft, FollowUpState } from "@/lib/contracts/leads"
 import {
   SIGNAL_LABEL,
@@ -54,11 +57,14 @@ export function FollowUpPanel({
   draft,
   state,
   contactEmail,
+  mailConfigured,
 }: {
   leadId: string
   draft: FollowUpDraft | null
   state: FollowUpState
   contactEmail: string | null
+  /** Whether a mailbox is connected. Decides which send routes are offered. */
+  mailConfigured: boolean
 }) {
   const [copied, setCopied] = useState(false)
 
@@ -150,14 +156,31 @@ export function FollowUpPanel({
           >
             <ShieldCheck className="mt-0.5 size-4 shrink-0" />
             <span>
-              This is a draft. Nothing has been sent — no email integration is
-              wired, and the system will not claim delivery it cannot prove.
+              {mailConfigured
+                ? contactEmail
+                  ? `This is a draft. Nothing has been sent yet — "Send now" delivers it to ${contactEmail} and records the send with the message id the mail server returns.`
+                  : "This is a draft. There is no email address on this lead, so it can only be copied out and sent by hand."
+                : "This is a draft. No mailbox is connected, so nothing can be sent from here — copy it out, then record the send with your mail client's message id."}
             </span>
           </div>
         ) : null}
       </CardContent>
 
       <CardFooter className="flex flex-wrap gap-2">
+        {/*
+          * The real send leads, because it is the one that is safe to press:
+          * it either delivers and records proof, or it fails and changes
+          * nothing. The manual route stays beside it for a rep who prefers
+          * their own client, not as a fallback for this one.
+          */}
+        {mailConfigured && contactEmail ? (
+          <SendNowButton
+            leadId={leadId}
+            contactEmail={contactEmail}
+            disabled={state === "sent"}
+          />
+        ) : null}
+
         <Button variant="outline" onClick={copyMessage}>
           {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
           {copied ? "Copied" : "Copy draft"}
@@ -178,6 +201,82 @@ export function FollowUpPanel({
         <RecordSendDialog leadId={leadId} disabled={state === "sent"} />
       </CardFooter>
     </Card>
+  )
+}
+
+/**
+ * Sends the draft through the connected mailbox.
+ *
+ * Confirms first. Everything else on this page is reversible — a status can be
+ * changed back, the assistant can be re-run — but an email that has left the
+ * building cannot be recalled, so the one irreversible action asks.
+ */
+function SendNowButton({
+  leadId,
+  contactEmail,
+  disabled,
+}: {
+  leadId: string
+  contactEmail: string
+  disabled: boolean
+}) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
+
+  function submit() {
+    startTransition(async () => {
+      const result = await sendFollowUpEmail(leadId)
+
+      if (!result.ok) {
+        toast.error(result.message)
+        return
+      }
+
+      toast.success(result.message)
+      setOpen(false)
+      router.refresh()
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button disabled={disabled}>
+          <Send className="size-4" />
+          {disabled ? "Sent" : "Send now"}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Send this follow-up?</DialogTitle>
+          <DialogDescription>
+            The drafted message goes to <strong>{contactEmail}</strong> from the
+            connected mailbox. This cannot be undone. The lead moves to{" "}
+            <strong>sent</strong> only if the mail server accepts it, and the
+            message id it returns is stored as the proof.
+          </DialogDescription>
+        </DialogHeader>
+
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => setOpen(false)}
+            disabled={isPending}
+          >
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={isPending}>
+            {isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Send className="size-4" />
+            )}
+            {isPending ? "Sending…" : "Send it"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

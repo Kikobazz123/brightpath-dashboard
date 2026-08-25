@@ -23,7 +23,8 @@ import { revalidatePath } from "next/cache"
 
 import { createLeadSchema } from "@/lib/contracts/leads"
 import { CAPTURE_LIMIT, rateLimit } from "@/lib/api/rate-limit"
-import { createLead, runFullPipeline } from "@/lib/leads/service"
+import { acknowledgeEnquiry, notifyNewEnquiry } from "@/lib/mail/service"
+import { createLead, getLead, runFullPipeline } from "@/lib/leads/service"
 import { tenantId } from "@/lib/client/server-data"
 
 export type PublicCaptureResult =
@@ -131,8 +132,37 @@ export async function submitPublicLead(
     console.error("[public-capture] pipeline failed, lead retained", error)
   }
 
+  /**
+   * Notify the connected mailbox, and acknowledge to the sender.
+   *
+   * Deliberately after the pipeline, so the alert can carry the score — the
+   * difference between "a form was submitted" and "this one is worth opening
+   * now". Re-read rather than reusing `lead`, which was captured before the
+   * pipeline ran and has no assessment on it.
+   *
+   * Failures are logged and swallowed for the same reason the pipeline's are:
+   * the enquiry did arrive, it is on the board, and a visitor cannot act on
+   * "stored, but our SMTP credentials have expired".
+   */
+  try {
+    const analysed = await getLead(tenantId(), lead.id)
+
+    const notified = await notifyNewEnquiry(analysed)
+    if (notified.attempted && !notified.ok) {
+      console.error("[public-capture] enquiry notification failed", notified.reason)
+    }
+
+    const acknowledged = await acknowledgeEnquiry(analysed)
+    if (acknowledged.attempted && !acknowledged.ok) {
+      console.error("[public-capture] acknowledgement failed", acknowledged.reason)
+    }
+  } catch (error) {
+    console.error("[public-capture] mail step failed, lead retained", error)
+  }
+
   revalidatePath("/leads")
   revalidatePath("/dashboard")
+  revalidatePath("/mail")
 
   return {
     ok: true,

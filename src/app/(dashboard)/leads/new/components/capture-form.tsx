@@ -17,7 +17,7 @@
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
-import { Loader2, Sparkles } from "lucide-react"
+import { Loader2, Send, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -39,7 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { captureLead } from "@/lib/client/actions"
+import { captureLead, sendTestEmail } from "@/lib/client/actions"
 import {
   COMPANY_SIZE_BANDS,
   INTEREST_LEVELS,
@@ -57,8 +57,10 @@ We've set aside around £25,000 for this and we'd like something live before our
 export function CaptureForm() {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [isTesting, startTesting] = useTransition()
   const [fields, setFields] = useState<Record<string, string[]>>({})
   const [message, setMessage] = useState("")
+  const [email, setEmail] = useState("")
 
   function onSubmit(formData: FormData) {
     setFields({})
@@ -74,6 +76,21 @@ export function CaptureForm() {
 
       toast.success(result.message)
       router.push(`/leads/${result.data.id}`)
+    })
+  }
+
+  /**
+   * Sends one message to the address typed above, without saving anything.
+   *
+   * Here rather than in Settings because this is where someone first wonders
+   * whether the mailing actually works, and because it answers the question
+   * with a message in a real inbox instead of a green tick.
+   */
+  function onTestSend() {
+    startTesting(async () => {
+      const result = await sendTestEmail(email)
+      if (result.ok) toast.success(result.message)
+      else toast.error(result.message)
     })
   }
 
@@ -141,12 +158,31 @@ export function CaptureForm() {
             <Input id="contact_name" name="contact_name" autoComplete="name" />
           </Field>
           <Field label="Email" name="contact_email" errors={fields["contact.email"]}>
-            <Input
-              id="contact_email"
-              name="contact_email"
-              type="email"
-              autoComplete="email"
-            />
+            <div className="flex gap-2">
+              <Input
+                id="contact_email"
+                name="contact_email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onTestSend}
+                disabled={isTesting || !email.includes("@")}
+                title="Send one test message to this address"
+              >
+                {isTesting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Send className="size-4" />
+                )}
+                Test
+              </Button>
+            </div>
           </Field>
           <Field label="Phone" name="contact_phone" errors={fields["contact.phone"]}>
             <Input id="contact_phone" name="contact_phone" type="tel" />
@@ -237,6 +273,29 @@ export function CaptureForm() {
                 Extract evidence, score against the rubric, draft a reply and
                 recommend a next action — before anyone opens the lead. This is
                 the delay BrightPath is losing deals to.
+              </span>
+            </span>
+          </label>
+
+          {/*
+            * Off by default, unlike the assistant above.
+            *
+            * Ticking this sends real mail to a real person. A rep typing up a
+            * call they have just finished does not want the caller to receive
+            * "thanks for your enquiry" ten seconds later, so the safe default
+            * is silence and the loud thing is opt-in.
+            */}
+          <label className="flex items-start gap-3 rounded-lg border p-3">
+            <Checkbox id="notify_contact" name="notify_contact" />
+            <span className="flex flex-col gap-1">
+              <span className="text-sm font-medium leading-none">
+                Email this contact and the team inbox
+              </span>
+              <span className="text-muted-foreground text-sm">
+                Sends an acknowledgement to the email address above and an alert
+                with the score to the connected mailbox — the same two messages
+                a website enquiry triggers. Leave it off unless you mean it:
+                these go to a real person.
               </span>
             </span>
           </label>
