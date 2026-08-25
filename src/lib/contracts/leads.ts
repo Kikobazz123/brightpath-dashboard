@@ -226,8 +226,25 @@ export const followUpDraftSchema = z.object({
   grounded_in: z.array(signalSchema),
   generated_at: z.string().datetime(),
   model: z.string(),
+  /**
+   * When a human last rewrote this draft, if they ever did.
+   *
+   * Optional because drafts written before editing existed do not carry it.
+   * Its presence matters: `model` and `grounded_in` describe what was
+   * generated, and the moment a person edits the wording those two stop being
+   * a complete account of the text. The panel says so rather than going on
+   * presenting hand-written prose as machine output.
+   */
+  edited_at: z.string().datetime().nullable().optional(),
 })
 export type FollowUpDraft = z.infer<typeof followUpDraftSchema>
+
+/** What a rep may change on a draft. Provenance fields are not theirs to set. */
+export const editFollowUpSchema = z.object({
+  subject: z.string().trim().min(1, "The subject cannot be empty.").max(200),
+  message: z.string().trim().min(1, "The message cannot be empty.").max(5000),
+})
+export type EditFollowUpInput = z.infer<typeof editFollowUpSchema>
 
 export const nextActionSchema = z.object({
   action: nextActionTypeSchema,

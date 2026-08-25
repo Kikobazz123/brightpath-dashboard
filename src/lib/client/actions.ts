@@ -38,18 +38,22 @@ import {
   type Lead,
   type LeadStatus,
   type UpdateLeadInput,
+  type EditFollowUpInput,
   companySizeSchema,
   confirmSendSchema,
   createLeadSchema,
+  editFollowUpSchema,
   interestLevelSchema,
   leadSourceSchema,
   updateLeadSchema,
   updateStatusSchema,
 } from "@/lib/contracts/leads"
 import {
+  ConflictError,
   NotFoundError,
   confirmSend,
   createLead,
+  editFollowUp,
   getLead,
   runAnalysis,
   runFollowUp,
@@ -104,6 +108,11 @@ function revalidateLead(id: string) {
 function describe(error: unknown, verb: string): ActionResult<never> {
   if (error instanceof NotFoundError) {
     return { ok: false, message: "That lead no longer exists." }
+  }
+
+  // A refused state change. The message explains the rule, so show it as-is.
+  if (error instanceof ConflictError) {
+    return { ok: false, message: error.message }
   }
 
   const message = error instanceof Error ? error.message : String(error)
@@ -437,6 +446,30 @@ export async function captureLead(
   } catch (error) {
     return describe(error, "capture that lead")
   }
+}
+
+/**
+ * Rewrite the drafted follow-up by hand.
+ *
+ * The model produces a first version; the words that actually reach a customer
+ * are the rep's. Refused once the message has been sent — see `editFollowUp`.
+ */
+export async function saveFollowUpDraft(
+  id: string,
+  input: EditFollowUpInput,
+): Promise<ActionResult<Lead>> {
+  const parsed = editFollowUpSchema.safeParse(input)
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "That draft cannot be saved as written.",
+      fields: fieldErrors(parsed.error),
+    }
+  }
+
+  return run(id, "save that draft", "Draft updated.", () =>
+    editFollowUp(tenantId(), id, parsed.data, actor()),
+  )
 }
 
 /**

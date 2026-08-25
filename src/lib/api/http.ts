@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import type { z } from "zod"
 
 import type { ApiErrorCode } from "@/lib/contracts/leads"
-import { NotFoundError } from "@/lib/leads/service"
+import { ConflictError, NotFoundError } from "@/lib/leads/service"
 
 /**
  * Shared HTTP plumbing: one response envelope, one auth check, one error map.
@@ -181,6 +181,15 @@ export function parseQuery<S extends z.ZodType>(
 export function handleError(error: unknown): NextResponse {
   if (error instanceof NotFoundError) {
     return fail("not_found", "Lead not found.")
+  }
+
+  /**
+   * A refused state change: the lead exists, the operation does not apply to
+   * it. Its message states a rule rather than describing internals, so unlike
+   * the generic branch below it is safe to pass through verbatim.
+   */
+  if (error instanceof ConflictError) {
+    return fail("conflict", error.message)
   }
 
   const message = error instanceof Error ? error.message : String(error)

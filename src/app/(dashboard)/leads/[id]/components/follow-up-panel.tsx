@@ -20,7 +20,7 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Check, Copy, Loader2, Send, ShieldCheck } from "lucide-react"
+import { Check, Copy, Loader2, Pencil, Send, ShieldCheck } from "lucide-react"
 
 import { FollowUpBadge } from "@/components/leads/badges"
 import { Badge } from "@/components/ui/badge"
@@ -44,7 +44,12 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { markFollowUpSent, sendFollowUpEmail } from "@/lib/client/actions"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  markFollowUpSent,
+  saveFollowUpDraft,
+  sendFollowUpEmail,
+} from "@/lib/client/actions"
 import type { FollowUpDraft, FollowUpState } from "@/lib/contracts/leads"
 import {
   SIGNAL_LABEL,
@@ -67,6 +72,7 @@ export function FollowUpPanel({
   mailConfigured: boolean
 }) {
   const [copied, setCopied] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   if (!draft) {
     return (
@@ -107,27 +113,45 @@ export function FollowUpPanel({
           Drafted {formatTimestamp(draft.generated_at)} by{" "}
           <span className="font-mono text-xs">{draft.model}</span>
           {contactEmail ? ` · for ${contactEmail}` : null}
+          {draft.edited_at ? (
+            <>
+              {" · "}
+              <span className="text-foreground font-medium">
+                edited by hand {formatTimestamp(draft.edited_at)}
+              </span>
+            </>
+          ) : null}
         </CardDescription>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label className="text-muted-foreground text-xs uppercase tracking-wide">
-            Subject
-          </Label>
-          <p className="font-medium">{draft.subject}</p>
-        </div>
+        {editing ? (
+          <DraftEditor
+            leadId={leadId}
+            draft={draft}
+            onClose={() => setEditing(false)}
+          />
+        ) : (
+          <>
+            <div className="flex flex-col gap-2">
+              <Label className="text-muted-foreground text-xs uppercase tracking-wide">
+                Subject
+              </Label>
+              <p className="font-medium">{draft.subject}</p>
+            </div>
 
-        <div className="flex flex-col gap-2">
-          <Label className="text-muted-foreground text-xs uppercase tracking-wide">
-            Message
-          </Label>
-          <div className="bg-muted/40 rounded-lg border p-4">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">
-              {draft.message}
-            </p>
-          </div>
-        </div>
+            <div className="flex flex-col gap-2">
+              <Label className="text-muted-foreground text-xs uppercase tracking-wide">
+                Message
+              </Label>
+              <div className="bg-muted/40 rounded-lg border p-4">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                  {draft.message}
+                </p>
+              </div>
+            </div>
+          </>
+        )}
 
         {draft.grounded_in.length > 0 ? (
           <div className="flex flex-col gap-2">
@@ -177,8 +201,22 @@ export function FollowUpPanel({
           <SendNowButton
             leadId={leadId}
             contactEmail={contactEmail}
-            disabled={state === "sent"}
+            disabled={state === "sent" || editing}
           />
+        ) : null}
+
+        {/*
+          * Editing stops once the message has gone out. The stored draft is
+          * the only record of what the recipient actually received, so letting
+          * it be rewritten afterwards would leave the audit trail disagreeing
+          * with their inbox. The service refuses it too — this only hides a
+          * button that would fail.
+          */}
+        {!editing && state !== "sent" && state !== "replied" ? (
+          <Button variant="outline" onClick={() => setEditing(true)}>
+            <Pencil className="size-4" />
+            Edit draft
+          </Button>
         ) : null}
 
         <Button variant="outline" onClick={copyMessage}>
@@ -201,6 +239,90 @@ export function FollowUpPanel({
         <RecordSendDialog leadId={leadId} disabled={state === "sent"} />
       </CardFooter>
     </Card>
+  )
+}
+
+/**
+ * Rewrite the draft in place.
+ *
+ * Seeded from the current draft rather than starting blank — the point is to
+ * adjust a sentence or fix a sign-off, not to retype the message. Saving stamps
+ * `edited_at`, which is what stops the panel from going on describing
+ * hand-written prose as the model's output.
+ */
+function DraftEditor({
+  leadId,
+  draft,
+  onClose,
+}: {
+  leadId: string
+  draft: FollowUpDraft
+  onClose: () => void
+}) {
+  const router = useRouter()
+  const [subject, setSubject] = useState(draft.subject)
+  const [message, setMessage] = useState(draft.message)
+  const [isPending, startTransition] = useTransition()
+
+  const dirty = subject !== draft.subject || message !== draft.message
+  const valid = subject.trim().length > 0 && message.trim().length > 0
+
+  function save() {
+    startTransition(async () => {
+      const result = await saveFollowUpDraft(leadId, { subject, message })
+
+      if (!result.ok) {
+        toast.error(result.message)
+        return
+      }
+
+      toast.success(result.message)
+      onClose()
+      router.refresh()
+    })
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="draft_subject">Subject</Label>
+        <Input
+          id="draft_subject"
+          value={subject}
+          onChange={(event) => setSubject(event.target.value)}
+          disabled={isPending}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="draft_message">Message</Label>
+        <Textarea
+          id="draft_message"
+          rows={12}
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          disabled={isPending}
+          className="resize-y font-normal leading-relaxed"
+        />
+        <p className="text-muted-foreground text-xs">
+          Blank lines are kept exactly as you type them — this is the text that
+          gets sent.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={save} disabled={isPending || !dirty || !valid}>
+          {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+          {isPending ? "Saving…" : "Save draft"}
+        </Button>
+        <Button variant="ghost" onClick={onClose} disabled={isPending}>
+          Cancel
+        </Button>
+        {dirty ? (
+          <span className="text-muted-foreground text-xs">Unsaved changes</span>
+        ) : null}
+      </div>
+    </div>
   )
 }
 

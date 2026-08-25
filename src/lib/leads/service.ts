@@ -4,6 +4,8 @@ import {
   type Activity,
   type ActivityType,
   type CreateLeadInput,
+  type EditFollowUpInput,
+  type FollowUpDraft,
   type Lead,
   type LeadSource,
   type LeadSummary,
@@ -36,6 +38,16 @@ export class NotFoundError extends Error {
     super(`Lead ${id} not found`)
   }
 }
+
+/**
+ * The request was understood and refused because the lead is in the wrong
+ * state for it — editing a follow-up that has already gone out, say.
+ *
+ * Distinct from NotFoundError because the message is worth showing verbatim:
+ * it explains a rule, and a rep who reads it learns why rather than seeing a
+ * generic failure.
+ */
+export class ConflictError extends Error {}
 
 /* ------------------------------------------------------------------ *
  * Mapping
@@ -586,6 +598,55 @@ export async function updateStatus(
     from: before.status,
     to: status,
     note,
+  })
+
+  return getLead(tenantId, id)
+}
+
+/**
+ * Rewrite the drafted follow-up by hand.
+ *
+ * The model writes a first version; a rep owns the words that actually go out.
+ * Two constraints keep that from damaging the audit trail:
+ *
+ *   - A sent draft is frozen. Editing text that has already been delivered
+ *     would leave the record disagreeing with the recipient's inbox, and the
+ *     stored message is the only evidence of what was said.
+ *   - `edited_at` is stamped, so `model` and `grounded_in` are no longer read
+ *     as a full account of prose a human has since changed.
+ */
+export async function editFollowUp(
+  tenantId: string,
+  id: string,
+  input: EditFollowUpInput,
+  actor: string,
+): Promise<Lead> {
+  const lead = await getLead(tenantId, id)
+
+  if (!lead.follow_up) {
+    throw new ConflictError("There is no drafted follow-up to edit yet.")
+  }
+  if (lead.follow_up_state === "sent" || lead.follow_up_state === "replied") {
+    throw new ConflictError(
+      "This follow-up has already been sent, so its wording is fixed.",
+    )
+  }
+
+  const draft: FollowUpDraft = {
+    ...lead.follow_up,
+    subject: input.subject,
+    message: input.message,
+    edited_at: new Date().toISOString(),
+  }
+
+  await getDb()
+    .update(leads)
+    .set({ followUp: draft, updatedAt: new Date() })
+    .where(and(eq(leads.id, id), eq(leads.tenantId, tenantId)))
+
+  await logActivity(tenantId, id, "follow_up_drafted", actor, {
+    kind: "edited_by_hand",
+    subject: input.subject,
   })
 
   return getLead(tenantId, id)
