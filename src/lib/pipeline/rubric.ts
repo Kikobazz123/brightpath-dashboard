@@ -22,7 +22,21 @@ import type { Signal } from "@/lib/contracts/leads"
  * evidence in, same number out, every time, with a reason attached to each point.
  */
 
-export const RUBRIC_VERSION = "brightpath-bant-1.0.0"
+/**
+ * 1.1.0 — budget stopped being required in order to publish a score.
+ *
+ * Under 1.0.0 a lead that never mentioned money came back NEEDS_REVIEW with no
+ * number at all, however plainly it described the problem. That was wrong about
+ * how enquiries actually arrive: plenty of buyers with real budgets do not put
+ * a figure in a web form, and answering them with "cannot determine" threw away
+ * everything they had said.
+ *
+ * Budget now behaves like the other signals — stated and healthy earns its 20
+ * points, absent earns 0 and drags the total down by itself. What stops a
+ * no-figure lead being over-promoted is a gate rather than a refusal: see
+ * HIGH_PRIORITY_REQUIRES_STATED_BUDGET below.
+ */
+export const RUBRIC_VERSION = "brightpath-bant-1.1.0"
 
 /** Points available per signal. These must total 100. */
 export const WEIGHTS: Record<Signal, number> = {
@@ -36,11 +50,20 @@ export const WEIGHTS: Record<Signal, number> = {
 /**
  * Signals that must have evidence before any score is published.
  *
- * Need and budget are the two a salesperson would never eyeball, and the two a
- * language model is most tempted to invent. Without them the lead goes to
- * NEEDS_REVIEW rather than receiving a confident-looking number built on air.
+ * Only need. Without a problem there is nothing to assess — a score built on
+ * company size and tone alone would be a confident-looking number about a lead
+ * nobody can describe.
+ *
+ * Budget used to sit here too and no longer does (see RUBRIC_VERSION). It is
+ * still the signal a model is most tempted to invent, but the defence against
+ * that is the analyst refusing to estimate a figure from company size, not this
+ * rubric refusing to score anyone who stayed quiet about money.
+ *
+ * MIN_CONFIDENCE remains the backstop: a lead missing several signals at once
+ * still falls to NEEDS_REVIEW on coverage, so dropping budget widens what gets
+ * scored without opening the door to scoring near-empty enquiries.
  */
-export const REQUIRED_SIGNALS: Signal[] = ["need", "budget"]
+export const REQUIRED_SIGNALS: Signal[] = ["need"]
 
 /** Below this overall confidence the score is withheld for human review. */
 export const MIN_CONFIDENCE = 0.5
@@ -180,6 +203,72 @@ export const NO_BUDGET_DISQUALIFIES = true
  */
 export const HIGH_PRIORITY_REQUIRES_EXPLICIT_NEED = true
 export const EXPLICIT_NEED_BANDS = ["explicit", "explicit_urgent"] as const
+
+/**
+ * Top priority requires a stated figure.
+ *
+ * This is what replaced budget's place in REQUIRED_SIGNALS, and it is the
+ * difference between "we cannot assess this" and "we can, but not at the top of
+ * the queue". A lead with a perfect problem, perfect sector and an eager tone
+ * reaches 80 without ever naming a number — arithmetically HIGH, commercially
+ * unproven, because nobody has established there is money behind it.
+ *
+ * Capping at MEDIUM says both true things at once: worth working, not worth
+ * dropping a confirmed-budget lead for. The missing figure is the first thing
+ * a rep should ask about, and it shows in the reasons for exactly that purpose.
+ *
+ * Note this deliberately does not care how large the stated budget is. A small
+ * but real number still clears the gate; the rubric already prices size through
+ * BUDGET_BANDS, and gating on size as well would penalise it twice.
+ */
+export const HIGH_PRIORITY_REQUIRES_STATED_BUDGET = true
+
+/* ------------------------------------------------------------------ *
+ * Replying to an enquiry that cannot be assessed
+ * ------------------------------------------------------------------ */
+
+/**
+ * When the assistant writes a clarification instead of a sales follow-up.
+ *
+ * Two situations produce an enquiry there is nothing useful to say back to:
+ * one too sparse to assess, and one describing something BrightPath does not
+ * do. Both used to get a follow-up drafted anyway, which meant either a vague
+ * message pretending to be personalised, or silence.
+ *
+ * Neither is what a person would do. A person would write back, say what they
+ * would need to know to help, and invite the sender to fill in the gap. That
+ * is what a clarification is, and it goes into the same human review queue as
+ * every other draft — nothing here reaches a customer unread.
+ *
+ * Deliberately not a rejection. The system cannot tell a bad fit from a badly
+ * worded enquiry, and the difference between those two is a follow-up
+ * question, not a verdict.
+ */
+export const CLARIFY_WHEN_UNSCORABLE = true
+
+/**
+ * A lead describing no problem gets a clarification even when it scores.
+ *
+ * `need: "none"` is the closest thing the evidence has to "this is not about
+ * anything we do" — an enquiry about something outside BrightPath's business
+ * lands here, because no BrightPath-shaped problem could be quoted from it.
+ * Pitching into that reads as though nobody looked.
+ */
+export const CLARIFY_WHEN_NO_NEED = true
+
+/**
+ * What to ask for, per missing signal, in a customer's words.
+ *
+ * Phrased as questions a person would actually ask. Interest is absent on
+ * purpose: "how interested are you?" is not a question anyone asks a
+ * prospective customer, and its answer is inferred from behaviour anyway.
+ */
+export const CLARIFY_PROMPTS: Partial<Record<Signal, string>> = {
+  need: "what is going wrong today, and which part of the work it is slowing down",
+  budget: "roughly what they have set aside, even as a range",
+  company_fit: "how many people the business employs",
+  industry_fit: "what the business does",
+}
 
 /* ------------------------------------------------------------------ *
  * Interest

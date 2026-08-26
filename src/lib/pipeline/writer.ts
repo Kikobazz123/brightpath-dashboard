@@ -1,11 +1,18 @@
 import {
+  SIGNALS,
   followUpDraftSchema,
+  type DraftKind,
   type Evidence,
   type FollowUpDraft,
   type ScoreResult,
   type Signal,
 } from "@/lib/contracts/leads"
 import { generateStructured, registerStub } from "@/lib/ai/provider"
+import {
+  CLARIFY_PROMPTS,
+  CLARIFY_WHEN_NO_NEED,
+  CLARIFY_WHEN_UNSCORABLE,
+} from "./rubric"
 
 /**
  * Follow-Up Writer.
@@ -35,6 +42,36 @@ Rules:
 
 Return the subject line, the message body, and the list of signals you actually referenced.`
 
+/**
+ * The prompt used when there is nothing solid enough to follow up on.
+ *
+ * The hard part is tone. This message goes to someone who has just taken the
+ * trouble to contact a company, and the honest content of it is "we cannot
+ * work out what you need" — which is easy to write in a way that reads as
+ * being marked wrong. So the rules below spend most of their effort on not
+ * doing that: no judgement about the enquiry, no implication of a mistake,
+ * and questions rather than requirements.
+ *
+ * It also never says the enquiry was unscorable, or that anything scored it.
+ * That is our internal machinery and would be alarming to read.
+ */
+const CLARIFY_PROMPT = `You write short replies for BrightPath Solutions, which designs, builds and supports custom software for small and medium businesses: internal tools, integrations, and full product builds.
+
+Someone has sent an enquiry that does not yet contain enough for a colleague to give them a useful answer. Your job is to write back and ask for what is missing, so they can reply once and get a real response.
+
+Rules:
+- Be warm and brief. Thank them for getting in touch. Five sentences maximum.
+- Never suggest they did anything wrong, left anything out, or filled a form in badly. The gap is ours to close by asking.
+- Never mention scoring, qualification, assessment, review, or any internal process. There is no system, only a company writing back.
+- Ask only for the specific details listed as missing. Put them as natural questions, not as a form or a bulleted list of requirements.
+- If nothing about the enquiry relates to building or supporting software, do not say they are the wrong fit — say plainly what BrightPath does, and ask what they are trying to achieve, so they can tell you if there is something there.
+- Never invent a detail about their business, and never guess what their problem might be.
+- No pricing, no sales pitch, no promises about what BrightPath can deliver — nothing has been established yet.
+- Sign off as "The BrightPath Team". Never sign a specific person's name.
+- Lay it out as an email: greeting on its own line, a blank line before the sign-off, and the team name on the line below it.
+
+Return the subject line, the message body, and an empty list for the signals referenced.`
+
 const RESPONSE_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -56,6 +93,23 @@ registerStub(SYSTEM_PROMPT, () => ({
   subject: "[Draft unavailable — no AI provider configured]",
   message:
     "No AI provider is configured, so no follow-up was written.\n\n" +
+    "Set AI_PROVIDER and the matching key in .env.local to enable drafting. " +
+    "Nothing has been sent.",
+  grounded_in: [],
+}))
+
+/**
+ * The clarification path needs its own stub.
+ *
+ * Stubs are keyed on the system prompt, so without this an unconfigured
+ * install would throw on exactly the enquiries that most need handling — the
+ * thin ones. Same honest placeholder as above.
+ */
+registerStub(CLARIFY_PROMPT, () => ({
+  subject: "[Draft unavailable — no AI provider configured]",
+  message:
+    "This enquiry needs more detail before anyone can answer it, but no AI " +
+    "provider is configured, so no reply was written.\n\n" +
     "Set AI_PROVIDER and the matching key in .env.local to enable drafting. " +
     "Nothing has been sent.",
   grounded_in: [],
@@ -128,6 +182,67 @@ export function tidyMessage(raw: string): string {
   return [greeting, body, signOff].filter(Boolean).join("\n\n")
 }
 
+/**
+ * Which kind of message this enquiry warrants.
+ *
+ * Policy, so it is decided here in code rather than by asking the model to
+ * judge its own footing — a model asked "can you personalise this?" will
+ * almost always say yes.
+ *
+ * The assessment is read for `qualification_status` only. The score itself is
+ * never consulted and never reaches a prompt: which message to write is a
+ * different question from how good the lead is, and a low-scoring lead that
+ * stated its problem clearly still gets a proper follow-up.
+ */
+export function chooseDraftKind(
+  evidence: Evidence,
+  assessment: ScoreResult | null,
+): DraftKind {
+  if (CLARIFY_WHEN_UNSCORABLE && assessment?.qualification_status === "NEEDS_REVIEW") {
+    return "clarification"
+  }
+
+  if (CLARIFY_WHEN_NO_NEED) {
+    const need = evidence.items.find((i) => i.signal === "need")
+    const stated = need?.present && need.value && need.value !== "none"
+    if (!stated) return "clarification"
+  }
+
+  return "follow_up"
+}
+
+/**
+ * What to ask for, in the order the rubric lists it.
+ *
+ * Only signals with no evidence at all. A signal the lead answered vaguely is
+ * still an answer, and asking again for something they believe they already
+ * told you is the fastest way to look like nobody read it.
+ */
+function missingSheet(evidence: Evidence): string {
+  const absent = SIGNALS.filter((signal) => {
+    const item = evidence.items.find((i) => i.signal === signal)
+    return !item?.present || item.value === null || item.value === "none"
+  })
+
+  const asks = absent
+    .map((signal) => CLARIFY_PROMPTS[signal])
+    .filter((ask): ask is string => Boolean(ask))
+
+  const known = evidence.items
+    .filter((i) => i.present && i.value && i.value !== "none")
+    .map((i) => `- ${i.signal}: ${i.value}`)
+
+  const context = known.length
+    ? `What they did tell us, which you may refer to:\n${known.join("\n")}\n\n`
+    : "They told us nothing we could pin down.\n\n"
+
+  return asks.length
+    ? `${context}Missing — ask for these, and nothing else:\n${asks
+        .map((a) => `- ${a}`)
+        .join("\n")}`
+    : `${context}Nothing specific is missing, but the enquiry does not describe a problem BrightPath could act on. Ask what they are trying to achieve.`
+}
+
 export interface WriteResult {
   draft: FollowUpDraft
   provider: string
@@ -149,11 +264,25 @@ export interface WriteResult {
 export async function writeFollowUp(
   evidence: Evidence,
   contactName: string | null,
-  _assessment: ScoreResult | null,
+  assessment: ScoreResult | null,
 ): Promise<WriteResult> {
+  /**
+   * An enquiry too thin to act on gets a different message, not a worse one.
+   *
+   * The old behaviour ran the sales prompt regardless and leaned on a single
+   * rule inside it to cope, which produced a follow-up that referenced nothing
+   * and asked for nothing in particular. Choosing the prompt in code instead
+   * means the request for detail is specific, and that a clarification is
+   * labelled as one rather than filed as a pitch.
+   */
+  const kind = chooseDraftKind(evidence, assessment)
+  const clarifying = kind === "clarification"
+
   const result = await generateStructured({
-    system: SYSTEM_PROMPT,
-    user: factSheet(evidence, contactName),
+    system: clarifying ? CLARIFY_PROMPT : SYSTEM_PROMPT,
+    user: clarifying
+      ? `${contactName ? `Their name: ${contactName}\n\n` : ""}${missingSheet(evidence)}`
+      : factSheet(evidence, contactName),
     schema: RESPONSE_SCHEMA as unknown as Record<string, unknown>,
     maxOutputTokens: 1024,
   })
@@ -173,9 +302,21 @@ export async function writeFollowUp(
     : []
 
   const parsed = followUpDraftSchema.safeParse({
-    subject: typeof raw.subject === "string" ? raw.subject.trim() : "Following up",
+    subject:
+      typeof raw.subject === "string"
+        ? raw.subject.trim()
+        : clarifying
+          ? "A couple of questions about your enquiry"
+          : "Following up",
     message: typeof raw.message === "string" ? tidyMessage(raw.message) : "",
-    grounded_in: grounded,
+    kind,
+    /**
+     * A clarification is grounded in nothing by construction — it asks about
+     * what is missing rather than drawing on what is there. Forcing the list
+     * empty stops the provenance row claiming a personalisation that the
+     * message does not contain.
+     */
+    grounded_in: clarifying ? [] : grounded,
     generated_at: new Date().toISOString(),
     model: `${result.provider}:${result.model}`,
   })
@@ -186,6 +327,7 @@ export async function writeFollowUp(
         subject: "[Draft failed validation]",
         message:
           "The generated follow-up did not match the expected shape and was discarded. Nothing has been sent.",
+        kind,
         grounded_in: [],
         generated_at: new Date().toISOString(),
         model: `${result.provider}:${result.model}`,

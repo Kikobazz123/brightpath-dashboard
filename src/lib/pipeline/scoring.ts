@@ -16,6 +16,7 @@ import {
   COMPANY_SIZE_POINTS,
   EXPLICIT_NEED_BANDS,
   HIGH_PRIORITY_REQUIRES_EXPLICIT_NEED,
+  HIGH_PRIORITY_REQUIRES_STATED_BUDGET,
   INDUSTRY_POINTS,
   INTEREST_POINTS,
   MIN_CONFIDENCE,
@@ -305,6 +306,34 @@ export function scoreLead(
       direction: "negative",
       explanation:
         "Gate: the lead stated outright that no budget exists, which ends qualification regardless of the other signals.",
+    })
+  }
+
+  /**
+   * No stated figure caps the lead at MEDIUM.
+   *
+   * Tests the parsed amount rather than `present`, so "we have about £20k" and
+   * "budget: not sure yet" are told apart — the second is a mention of money,
+   * not a figure, and it establishes nothing about whether a deal can be paid
+   * for. An explicit "no budget" is already handled by the gate above.
+   */
+  if (
+    HIGH_PRIORITY_REQUIRES_STATED_BUDGET &&
+    priority === "HIGH" &&
+    !(
+      budgetItem?.present &&
+      budgetItem.value != null &&
+      (parseBudget(budgetItem.value) ?? 0) > 0
+    )
+  ) {
+    priority = "MEDIUM"
+    reasons.push({
+      signal: "budget",
+      points_awarded: 0,
+      points_possible: 0,
+      direction: "neutral",
+      explanation:
+        "Gate: capped at MEDIUM because no budget figure was stated. The lead is worth working — ask what they have set aside before it displaces one that has.",
     })
   }
 

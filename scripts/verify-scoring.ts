@@ -18,6 +18,7 @@ import {
   type Signal,
 } from "../src/lib/contracts/leads"
 import { scoreLead } from "../src/lib/pipeline/scoring"
+import { chooseDraftKind } from "../src/lib/pipeline/writer"
 import { RUBRIC_VERSION, WEIGHTS } from "../src/lib/pipeline/rubric"
 
 let passed = 0
@@ -77,11 +78,24 @@ const weakLead = evidence([
   item("interest", "low"),
 ])
 
+/**
+ * A strong enquiry that never mentions money — the ordinary case the 1.1.0
+ * rubric change was made for. Everything else is present and healthy.
+ */
 const missingBudget = evidence([
   item("company_fit", "50-249"),
   item("industry_fit", "accounting"),
   item("need", "explicit"),
   item("budget", null),
+  item("interest", "high"),
+])
+
+/** Need is the one signal still required — without it there is nothing to assess. */
+const missingNeed = evidence([
+  item("company_fit", "50-249"),
+  item("industry_fit", "accounting"),
+  item("need", null),
+  item("budget", "30000"),
   item("interest", "high"),
 ])
 
@@ -143,21 +157,74 @@ check("every awarded point traces to a named rubric line", () => {
 
 console.log("\nMissing evidence is surfaced, never guessed")
 check("absent required signal forces NEEDS_REVIEW with no score", () => {
-  const r = scoreLead(missingBudget)
+  const r = scoreLead(missingNeed)
   assert.equal(r.qualification_status, "NEEDS_REVIEW")
   assert.equal(r.score, null, "a withheld score must be null, not zero")
   assert.equal(r.priority, null)
   assert.ok(
-    r.missing_information.includes("budget"),
+    r.missing_information.includes("need"),
     "the missing signal must be named",
   )
 })
 
 check("NEEDS_REVIEW still explains what it did see", () => {
+  const r = scoreLead(missingNeed)
+  const budget = r.reasons.find((x) => x.signal === "budget")
+  assert.ok(budget, "reasons are still returned when review is required")
+  assert.ok(budget!.points_awarded > 0)
+})
+
+/**
+ * Rubric 1.1.0. A silent budget used to withhold the score entirely; it now
+ * scores on what the lead did say and is capped rather than refused.
+ */
+console.log("\nA lead that never mentions money is still scored")
+check("no stated budget still produces a score, not NEEDS_REVIEW", () => {
   const r = scoreLead(missingBudget)
-  const need = r.reasons.find((x) => x.signal === "need")
-  assert.ok(need, "reasons are still returned when review is required")
-  assert.ok(need!.points_awarded > 0)
+  // 20 company + 15 industry + 20 need + 0 budget + 20 interest = 75
+  assert.equal(r.qualification_status, "QUALIFIED")
+  assert.equal(r.score, 75)
+  assert.ok(
+    r.missing_information.includes("budget"),
+    "the gap is still named, it just no longer withholds the score",
+  )
+})
+
+check("no stated budget is capped at MEDIUM however well it scores", () => {
+  const r = scoreLead(missingBudget)
+  assert.ok(r.score !== null && r.score >= 70, "the raw total reaches HIGH")
+  assert.equal(r.priority, "MEDIUM", "but the gate holds it at MEDIUM")
+  assert.ok(
+    r.reasons.some(
+      (x) => x.signal === "budget" && /no budget figure was stated/i.test(x.explanation),
+    ),
+    "the cap must explain itself",
+  )
+})
+
+check("a stated budget lifts the same lead to HIGH", () => {
+  const withBudget = evidence([
+    item("company_fit", "50-249"),
+    item("industry_fit", "accounting"),
+    item("need", "explicit"),
+    item("budget", "30000"),
+    item("interest", "high"),
+  ])
+  const r = scoreLead(withBudget)
+  assert.equal(r.priority, "HIGH", "naming a figure is what unlocks HIGH")
+})
+
+check("a small but real budget still clears the gate", () => {
+  const modest = evidence([
+    item("company_fit", "50-249"),
+    item("industry_fit", "accounting"),
+    item("need", "explicit_urgent"),
+    item("budget", "3000"),
+    item("interest", "high"),
+  ])
+  const r = scoreLead(modest)
+  // 20 + 15 + 25 + 5 + 20 = 85: the gate asks for a figure, not a large one
+  assert.equal(r.priority, "HIGH")
 })
 
 check("low confidence alone forces review even with full coverage", () => {
@@ -305,6 +372,63 @@ check("real scoring output always satisfies the contract", () => {
       )}`,
     )
   }
+})
+
+/**
+ * Which message an enquiry earns is policy, so it is decided in code and
+ * checked here. Pure — no provider is called to work out the routing.
+ */
+console.log("\nAn enquiry that cannot be answered gets a clarification")
+check("a lead with a stated problem gets a sales follow-up", () => {
+  assert.equal(chooseDraftKind(strongLead, scoreLead(strongLead)), "follow_up")
+})
+
+check("a lead with no stated budget still gets a sales follow-up", () => {
+  assert.equal(
+    chooseDraftKind(missingBudget, scoreLead(missingBudget)),
+    "follow_up",
+    "a silent budget is no longer a reason to stop selling to someone",
+  )
+})
+
+check("an unscorable lead gets a clarification", () => {
+  assert.equal(chooseDraftKind(missingNeed, scoreLead(missingNeed)), "clarification")
+})
+
+check("a lead describing no problem gets a clarification even when it scores", () => {
+  const noProblem = evidence([
+    item("company_fit", "50-249"),
+    item("industry_fit", "accounting"),
+    item("need", "none"),
+    item("budget", "30000"),
+    item("interest", "high"),
+  ])
+  const assessment = scoreLead(noProblem)
+  assert.ok(assessment.score !== null, "it scores on the other four signals")
+  assert.equal(
+    chooseDraftKind(noProblem, assessment),
+    "clarification",
+    "nothing BrightPath does was described, so there is nothing to pitch",
+  )
+})
+
+check("an off-topic enquiry gets a clarification, not a pitch", () => {
+  const offTopic = evidence([
+    item("company_fit", null),
+    item("industry_fit", "deep sea mining"),
+    item("need", "none"),
+    item("budget", null),
+    item("interest", "low"),
+  ])
+  assert.equal(chooseDraftKind(offTopic, scoreLead(offTopic)), "clarification")
+})
+
+check("a weak but real enquiry is still sold to, not questioned", () => {
+  assert.equal(
+    chooseDraftKind(weakLead, scoreLead(weakLead)),
+    "follow_up",
+    "scoring badly is not the same as being unreadable",
+  )
 })
 
 console.log(`\n${passed} passed, ${failed} failed\n`)

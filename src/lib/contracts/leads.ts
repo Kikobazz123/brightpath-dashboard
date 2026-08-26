@@ -219,9 +219,27 @@ export const scoreResultSchema = z
   )
 export type ScoreResult = z.infer<typeof scoreResultSchema>
 
+/**
+ * What kind of message the draft is.
+ *
+ * `follow_up` is the sales reply: a lead was understood well enough to say
+ * something specific back. `clarification` is what gets written when it was
+ * not — the enquiry is too thin to assess, or describes nothing BrightPath
+ * does — and it asks for the missing detail instead of pitching.
+ *
+ * They are separated because a rep must be able to tell them apart at a
+ * glance. Sending a clarification believing it was a pitch, or the reverse,
+ * is the kind of mistake that reads as carelessness to the person receiving it.
+ */
+export const DRAFT_KINDS = ["follow_up", "clarification"] as const
+export const draftKindSchema = z.enum(DRAFT_KINDS)
+export type DraftKind = z.infer<typeof draftKindSchema>
+
 export const followUpDraftSchema = z.object({
   subject: z.string(),
   message: z.string(),
+  /** Optional: drafts written before clarifications existed carry no kind. */
+  kind: draftKindSchema.optional(),
   /** Which evidence items the message drew on, so personalization is checkable. */
   grounded_in: z.array(signalSchema),
   generated_at: z.string().datetime(),

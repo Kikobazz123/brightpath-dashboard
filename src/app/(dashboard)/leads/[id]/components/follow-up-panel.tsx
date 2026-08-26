@@ -20,7 +20,15 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Check, Copy, Loader2, Pencil, Send, ShieldCheck } from "lucide-react"
+import {
+  Check,
+  Copy,
+  HelpCircle,
+  Loader2,
+  Pencil,
+  Send,
+  ShieldCheck,
+} from "lucide-react"
 
 import { FollowUpBadge } from "@/components/leads/badges"
 import { Badge } from "@/components/ui/badge"
@@ -74,6 +82,13 @@ export function FollowUpPanel({
   const [copied, setCopied] = useState(false)
   const [editing, setEditing] = useState(false)
 
+  /**
+   * Drafts written before clarifications existed carry no kind, and those were
+   * all sales follow-ups — so an absent kind reads as `follow_up` rather than
+   * as unknown.
+   */
+  const clarifying = draft?.kind === "clarification"
+
   if (!draft) {
     return (
       <Card>
@@ -106,8 +121,11 @@ export function FollowUpPanel({
     <Card>
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-3">
-          <span>Follow-up</span>
+          <span>{clarifying ? "Clarification" : "Follow-up"}</span>
           <FollowUpBadge state={state} />
+          {clarifying ? (
+            <Badge variant="outline">Asks for detail</Badge>
+          ) : null}
         </CardTitle>
         <CardDescription>
           Drafted {formatTimestamp(draft.generated_at)} by{" "}
@@ -169,6 +187,29 @@ export function FollowUpPanel({
               The message draws only on these extracted signals, so every
               personal detail in it traces back to something the lead said.
             </p>
+          </div>
+        ) : null}
+
+        {/*
+          * Why this is a clarification rather than a pitch.
+          *
+          * Shown above the send controls on purpose: a rep who does not
+          * realise the enquiry was unreadable might send this thinking it is a
+          * sales reply, then wonder why it asks so many questions.
+          */}
+        {clarifying && state !== "sent" && state !== "replied" ? (
+          <div
+            className={
+              "flex items-start gap-3 rounded-lg p-3 text-sm " + toneClass("warning")
+            }
+          >
+            <HelpCircle className="mt-0.5 size-4 shrink-0" />
+            <span>
+              This enquiry did not say enough to answer properly, so the
+              assistant wrote back asking for the missing detail instead of
+              pitching. Read it before sending — if you can already tell what
+              they need, edit it into a real reply.
+            </span>
           </div>
         ) : null}
 
