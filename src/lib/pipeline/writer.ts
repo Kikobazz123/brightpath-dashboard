@@ -219,6 +219,45 @@ export function chooseDraftKind(
  * told you is the fastest way to look like nobody read it.
  */
 function missingSheet(evidence: Evidence): string {
+  const known = evidence.items
+    .filter((i) => i.present && i.value && i.value !== "none")
+    .map((i) => `- ${i.signal}: ${i.value}`)
+
+  const context = known.length
+    ? `What they did tell us, which you may refer to:\n${known.join("\n")}\n\n`
+    : "They told us nothing we could pin down.\n\n"
+
+  const need = evidence.items.find((i) => i.signal === "need")
+  const describedAProblem = Boolean(
+    need?.present && need.value && need.value !== "none",
+  )
+
+  /**
+   * No problem described at all — which is where a genuinely off-topic enquiry
+   * lands, someone asking whether we sell generators.
+   *
+   * Asking that person their headcount and budget is worse than saying
+   * nothing: it implies we are quoting for the thing they asked about, and
+   * they answer three questions before discovering we were never the right
+   * company. So those asks are suppressed and the reply leads with what
+   * BrightPath actually does, which lets them rule us out in one line — or
+   * discover there is a software problem worth describing after all.
+   */
+  if (!describedAProblem) {
+    return (
+      `${context}They have not described a problem BrightPath could work on. ` +
+      `This may be an enquiry about something we do not do at all.\n\n` +
+      `Do NOT ask about budget, headcount, or industry — nothing has been ` +
+      `established yet, and asking would imply we are already quoting for ` +
+      `whatever they had in mind.\n\n` +
+      `Instead: say plainly and briefly that BrightPath designs, builds and ` +
+      `supports custom software — internal tools, integrations and full ` +
+      `product builds — and ask what they are trying to achieve, so they can ` +
+      `tell you whether there is something there. Leave the door open without ` +
+      `promising anything.`
+    )
+  }
+
   const absent = SIGNALS.filter((signal) => {
     const item = evidence.items.find((i) => i.signal === signal)
     return !item?.present || item.value === null || item.value === "none"
@@ -228,19 +267,12 @@ function missingSheet(evidence: Evidence): string {
     .map((signal) => CLARIFY_PROMPTS[signal])
     .filter((ask): ask is string => Boolean(ask))
 
-  const known = evidence.items
-    .filter((i) => i.present && i.value && i.value !== "none")
-    .map((i) => `- ${i.signal}: ${i.value}`)
-
-  const context = known.length
-    ? `What they did tell us, which you may refer to:\n${known.join("\n")}\n\n`
-    : "They told us nothing we could pin down.\n\n"
-
   return asks.length
-    ? `${context}Missing — ask for these, and nothing else:\n${asks
-        .map((a) => `- ${a}`)
-        .join("\n")}`
-    : `${context}Nothing specific is missing, but the enquiry does not describe a problem BrightPath could act on. Ask what they are trying to achieve.`
+    ? `${context}They have described a problem, so this is a real enquiry — it ` +
+        `is simply missing detail.\n\nAsk for these, and nothing else:\n${asks
+          .map((a) => `- ${a}`)
+          .join("\n")}`
+    : `${context}Ask them to describe what is going wrong in a little more detail.`
 }
 
 export interface WriteResult {
