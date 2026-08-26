@@ -525,6 +525,12 @@ export async function runFollowUp(tenantId: string, id: string): Promise<Lead> {
     lead.evidence!,
     lead.contact.name,
     lead.assessment,
+    /**
+     * The enquiry itself, which only the clarification path reads. A reply
+     * asking what someone needs cannot be written without seeing what they
+     * asked for — see `missingSheet`.
+     */
+    lead.normalized_context,
   )
 
   await getDb()

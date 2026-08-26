@@ -46,6 +46,20 @@ async function health() {
       ok: status !== "unhealthy",
       data: {
         status,
+        /**
+         * Which build is answering.
+         *
+         * Added after ten minutes were spent re-running a drafting endpoint to
+         * work out whether a push had deployed, when the deploy had landed
+         * immediately and the real fault was in the code. Nothing else exposed
+         * the running commit, so "is my fix live?" was unanswerable from
+         * outside — which is how a code bug ends up misdiagnosed as a deploy
+         * problem. Vercel injects these; both are absent locally.
+         */
+        build: {
+          commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local",
+          deployed_at: process.env.VERCEL_DEPLOYMENT_ID ? undefined : "local",
+        },
         checks: {
           database,
           database_ms: databaseMs,
