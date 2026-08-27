@@ -12,11 +12,16 @@ import { DotPattern } from '@/components/dot-pattern'
 /*
  * The four numbers a services buyer actually asks about.
  *
- * Each is stated as an honest floor rather than a rounded-up best case: "120+"
- * is a count there is a list behind, and "Under 2 hrs" is looser than the
- * assistant's own target — `SLA_FIRST_TOUCH_MINUTES` defaults to 15 — because
- * the promise on a marketing page should be the one that survives a bad week.
- * Anything here that stops being true gets edited down, not left to age.
+ * Response time is now the same 15 minutes the assistant is built to hold —
+ * `SLA_FIRST_TOUCH_MINUTES` in the rubric, which the pipeline measures every
+ * lead against and the dashboard reports breaches of. It read "Under 2 hrs"
+ * first, deliberately looser so the public promise would survive a bad week;
+ * quoting the real target instead is a stronger claim, and the one number here
+ * with a live measurement behind it rather than a count.
+ *
+ * That makes it the entry most exposed to going stale: if the breach rate on
+ * /dashboard climbs, this is the line to revise, and revising it down is the
+ * honest move rather than leaving it to age.
  */
 const stats = [
   {
@@ -39,7 +44,7 @@ const stats = [
   },
   {
     icon: Clock,
-    value: 'Under 2 hrs',
+    value: 'Under 15 min',
     label: 'Response time',
     description: 'Typical first reply'
   }
